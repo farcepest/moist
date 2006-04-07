@@ -100,7 +100,7 @@ ext_mysql_metadata = dict(
     libraries=libraries,
     extra_compile_args=extra_compile_args,
     extra_objects=extra_objects,
-    sources=['_mysql.c'],
+    sources=['_mysql.c', '_mysql_connections.c', '_mysql_results.c'],
     )
 if config.read(['site.cfg']):
     ext_mysql_metadata.update([ (k, v.split()) for k, v in config.items('compiler') ])
