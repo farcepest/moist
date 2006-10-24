@@ -77,8 +77,14 @@ _mysql_Exception(_mysql_ConnectionObject *c)
 #ifdef ER_NO_REFERENCED_ROW
 	case ER_NO_REFERENCED_ROW:
 #endif
+#ifdef ER_NO_REFERENCED_ROW_2
+	case ER_NO_REFERENCED_ROW_2:
+#endif
 #ifdef ER_ROW_IS_REFERENCED
 	case ER_ROW_IS_REFERENCED:
+#endif
+#ifdef ER_ROW_IS_REFERENCED_2
+	case ER_ROW_IS_REFERENCED_2:
 #endif
 #ifdef ER_CANNOT_ADD_FOREIGN
 	case ER_CANNOT_ADD_FOREIGN:
@@ -480,6 +486,9 @@ _mysql_NewException(
 	return e;
 }
 
+#define QUOTE(X) _QUOTE(X)
+#define _QUOTE(X) #X
+
 static char _mysql___doc__[] =
 "an adaptation of the MySQL C API (mostly)\n\
 \n\
@@ -514,11 +523,11 @@ init_mysql(void)
 
 	if (!(dict = PyModule_GetDict(module))) goto error;
 	if (PyDict_SetItemString(dict, "version_info",
-			       PyRun_String(version_info, Py_eval_input,
+			       PyRun_String(QUOTE(version_info), Py_eval_input,
 				       dict, dict)))
 		goto error;
 	if (PyDict_SetItemString(dict, "__version__",
-			       PyString_FromString(__version__)))
+			       PyString_FromString(QUOTE(__version__))))
 		goto error;
 	if (PyDict_SetItemString(dict, "connection",
 			       (PyObject *)&_mysql_ConnectionObject_Type))
