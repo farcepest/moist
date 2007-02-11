@@ -14,5 +14,13 @@ else: # assume windows
     from setup_windows import get_config
 
 metadata, options = get_config()
-metadata['ext_modules'] = [Extension(sources=['_mysql.c'], **options)]
+metadata['ext_modules'] = [
+    Extension(
+        sources = [
+            '_mysql.c',
+            '_mysql_connections.c',
+            '_mysql_results.c',
+            ],
+        **options),
+    ]
 setup(**metadata)

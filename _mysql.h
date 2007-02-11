@@ -78,3 +78,9 @@ PyObject *_mysql_MySQLError;
 
 extern PyObject *
 _mysql_Exception(_mysql_ConnectionObject *c);
+
+extern int
+_mysql_ResultObject_Initialize(
+	_mysql_ResultObject *self,
+	PyObject *args,
+	PyObject *kwargs);
