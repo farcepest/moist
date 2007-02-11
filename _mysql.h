@@ -75,6 +75,7 @@ PyObject *_mysql_MySQLError;
  PyObject *_mysql_InternalError; 
  PyObject *_mysql_ProgrammingError;
  PyObject *_mysql_NotSupportedError;
+PyObject *_mysql_error_map;
 
 extern PyObject *
 _mysql_Exception(_mysql_ConnectionObject *c);

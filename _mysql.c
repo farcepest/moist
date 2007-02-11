@@ -30,87 +30,14 @@ _mysql_Exception(_mysql_ConnectionObject *c)
 		Py_DECREF(t);
 		return NULL;
 	}
-	else switch (merr) {
-	case CR_COMMANDS_OUT_OF_SYNC:
-	case ER_DB_CREATE_EXISTS:
-	case ER_SYNTAX_ERROR:
-	case ER_PARSE_ERROR:
-	case ER_NO_SUCH_TABLE:
-	case ER_WRONG_DB_NAME:
-	case ER_WRONG_TABLE_NAME:
-	case ER_FIELD_SPECIFIED_TWICE:
-	case ER_INVALID_GROUP_FUNC_USE:
-	case ER_UNSUPPORTED_EXTENSION:
-	case ER_TABLE_MUST_HAVE_COLUMNS:
-#ifdef ER_CANT_DO_THIS_DURING_AN_TRANSACTION
-	case ER_CANT_DO_THIS_DURING_AN_TRANSACTION:
-#endif
-		e = _mysql_ProgrammingError;
-		break;
-#ifdef WARN_DATA_TRUNCATED
-	case WARN_DATA_TRUNCATED:
-#ifdef WARN_NULL_TO_NOTNULL
-	case WARN_NULL_TO_NOTNULL:
-#endif
-#ifdef ER_WARN_DATA_OUT_OF_RANGE
-	case ER_WARN_DATA_OUT_OF_RANGE:
-#endif
-#ifdef ER_NO_DEFAULT
-	case ER_NO_DEFAULT:
-#endif
-#ifdef ER_PRIMARY_CANT_HAVE_NULL
-	case ER_PRIMARY_CANT_HAVE_NULL:
-#endif
-#ifdef ER_DATA_TOO_LONG
-	case ER_DATA_TOO_LONG:
-#endif
-#ifdef ER_DATETIME_FUNCTION_OVERFLOW
-	case ER_DATETIME_FUNCTION_OVERFLOW:
-#endif
-		e = _mysql_DataError;
-		break;
-#endif
-	case ER_DUP_ENTRY:
-#ifdef ER_DUP_UNIQUE
-	case ER_DUP_UNIQUE:
-#endif
-#ifdef ER_NO_REFERENCED_ROW
-	case ER_NO_REFERENCED_ROW:
-#endif
-#ifdef ER_NO_REFERENCED_ROW_2
-	case ER_NO_REFERENCED_ROW_2:
-#endif
-#ifdef ER_ROW_IS_REFERENCED
-	case ER_ROW_IS_REFERENCED:
-#endif
-#ifdef ER_ROW_IS_REFERENCED_2
-	case ER_ROW_IS_REFERENCED_2:
-#endif
-#ifdef ER_CANNOT_ADD_FOREIGN
-	case ER_CANNOT_ADD_FOREIGN:
-#endif
-		e = _mysql_IntegrityError;
-		break;
-#ifdef ER_WARNING_NOT_COMPLETE_ROLLBACK
-	case ER_WARNING_NOT_COMPLETE_ROLLBACK:
-#endif
-#ifdef ER_NOT_SUPPORTED_YET
-	case ER_NOT_SUPPORTED_YET:
-#endif
-#ifdef ER_FEATURE_DISABLED
-	case ER_FEATURE_DISABLED:
-#endif
-#ifdef ER_UNKNOWN_STORAGE_ENGINE
-	case ER_UNKNOWN_STORAGE_ENGINE:
-#endif
-		e = _mysql_NotSupportedError;
-		break;
-	default:
-		if (merr < 1000)
-			e = _mysql_InternalError;
-		else
-			e = _mysql_OperationalError;
-		break;
+	else {
+		PyObject *py_merr = PyInt_FromLong(merr);
+		e = PyDict_GetItem(_mysql_error_map, py_merr);
+		Py_DECREF(py_merr);
+		if (!e) {
+			if (merr < 1000) e = _mysql_InternalError;
+			else e = _mysql_OperationalError;
+		}
 	}
 	PyTuple_SET_ITEM(t, 0, PyInt_FromLong((long)merr));
 	PyTuple_SET_ITEM(t, 1, PyString_FromString(mysql_error(&(c->connection))));
@@ -572,6 +499,8 @@ init_mysql(void)
 		goto error;
 	if (!(_mysql_NotSupportedError =
 	      _mysql_NewException(dict, edict, "NotSupportedError")))
+		goto error;
+	if (!(_mysql_error_map = PyDict_GetItemString(edict, "error_map")))
 		goto error;
 	Py_DECREF(emod);
 	if (!(_mysql_NULL = PyString_FromString("NULL")))
