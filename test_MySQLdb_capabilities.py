@@ -36,19 +36,6 @@ class test_MySQLdb(test_capabilities.DatabaseTest):
         self.check_data_integrity(
             ('col1 TINYINT',),
             generator)
-
-    def test_SET(self):
-        things = 'ash birch cedar larch pine'.split()
-        def generator(row, col):
-            from sets import Set
-            s = Set()
-            for i in range(len(things)):
-                if (row >> i) & 1:
-                    s.add(things[i])
-            return s
-        self.check_data_integrity(
-            ('col1 SET(%s)' % ','.join(["'%s'" % t for t in things]),),
-            generator)
         
     def test_stored_procedures(self):
         db = self.connection
@@ -75,6 +62,16 @@ class test_MySQLdb(test_capabilities.DatabaseTest):
         c.execute("DROP PROCEDURE test_sp")
         c.execute('drop table %s' % (self.table))
 
+    def test_small_CHAR(self):
+        # Character data
+        def generator(row,col):
+            i = (row*col+62)%256
+            if i == 62: return ''
+            if i == 63: return None
+            return chr(i)
+        self.check_data_integrity(
+            ('col1 char(1)','col2 char(1)'),
+            generator)
         
 if __name__ == '__main__':
     if test_MySQLdb.leak_test:

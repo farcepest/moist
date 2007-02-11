@@ -866,7 +866,14 @@ This function can be used by clients that remain idle for a\n\
 long while, to check whether or not the server has closed the\n\
 connection and reconnect if necessary.\n\
 \n\
-Non-standard.\n\
+New in 1.2.2: Accepts an optional reconnect parameter. If True,\n\
+then the client will attempt reconnection. Note that this setting\n\
+is persistent. By default, this is on in MySQL<5.0.3, and off\n\
+thereafter.\n\
+\n\
+Non-standard. You should assume that ping() performs an\n\
+implicit rollback; use only when starting a new transaction.\n\
+You have been warned.\n\
 ";
 
 static PyObject *
@@ -874,9 +881,10 @@ _mysql_ConnectionObject_ping(
 	_mysql_ConnectionObject *self,
 	PyObject *args)
 {
-	int r;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+	int r, reconnect = -1;
+	if (!PyArg_ParseTuple(args, "|I", &reconnect)) return NULL;
 	check_connection(self);
+	if ( reconnect != -1 ) self->connection.reconnect = reconnect;
 	Py_BEGIN_ALLOW_THREADS
 	r = mysql_ping(&(self->connection));
 	Py_END_ALLOW_THREADS
