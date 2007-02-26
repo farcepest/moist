@@ -1,16 +1,19 @@
-"""MySQLdb - A DB API v2.0 compatible interface to MySQL.
+"""
+MySQLdb
+=======
+A DB API v2.0 compatible interface to MySQL
+-------------------------------------------
 
 This package is a wrapper around _mysql, which mostly implements the
 MySQL C API.
 
-connect() -- connects to server
-
 See the C API specification and the MySQL documentation for more info
 on other items.
 
+For information on the DB API, see PEP-249.
+
 For information on how MySQLdb handles type conversion, see the
 MySQLdb.converters module.
-
 """
 
 __revision__ = """$Revision$"""[11:-2]
@@ -33,10 +36,20 @@ from MySQLdb.times import Date, Time, Timestamp, \
     DateFromTicks, TimeFromTicks, TimestampFromTicks
 
 from sets import ImmutableSet
+
 class DBAPISet(ImmutableSet):
 
-    """A special type of set for which A == x is true if A is a
-    DBAPISet and x is a member of that set."""
+    """A special type of set for which A == x is True if A is a
+    DBAPISet and x is a member of that set.
+    
+      >>> FIELD_TYPE.VAR_STRING == STRING
+      True
+      >>> FIELD_TYPE.DATE == NUMBER
+      False
+      >>> FIELD_TYPE.DATE != DATE
+      False
+      
+    """
 
     def __ne__(self, other):
         from sets import BaseSet
@@ -77,17 +90,18 @@ def Connect(*args, **kwargs):
 
 connect = Connection = Connect
 
-__all__ = [ 'BINARY', 'Binary', 'Connect', 'Connection', 'DATE',
-    'Date', 'Time', 'Timestamp', 'DateFromTicks', 'TimeFromTicks',
-    'TimestampFromTicks', 'DataError', 'DatabaseError', 'Error',
-    'FIELD_TYPE', 'IntegrityError', 'InterfaceError', 'InternalError',
-    'MySQLError', 'NULL', 'NUMBER', 'NotSupportedError', 'DBAPISet',
-    'OperationalError', 'ProgrammingError', 'ROWID', 'STRING', 'TIME',
-    'TIMESTAMP', 'Warning', 'apilevel', 'connect', 'connections',
-    'constants', 'cursors', 'debug', 'escape', 'escape_dict',
-    'escape_sequence', 'escape_string', 'get_client_info',
-    'paramstyle', 'string_literal', 'threadsafety', 'version_info']
+__all__ = [ 'BINARY', 'Binary', 'Connect', 'Connection', 'DATE', 'Date',
+            'Time', 'Timestamp', 'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
+            'DataError', 'DatabaseError', 'Error', 'FIELD_TYPE', 'IntegrityError',
+            'InterfaceError', 'InternalError', 'MySQLError', 'NULL', 'NUMBER',
+            'NotSupportedError', 'DBAPISet', 'OperationalError', 'ProgrammingError',
+            'ROWID', 'STRING', 'TIME', 'TIMESTAMP', 'Warning', 'apilevel', 'connect',
+            'connections', 'constants', 'converters', 'cursors', 'debug', 'escape',
+            'escape_dict', 'escape_sequence', 'escape_string', 'get_client_info',
+            'paramstyle', 'string_literal', 'threadsafety', 'version_info']
 
 
-
-
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+    

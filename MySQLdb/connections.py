@@ -261,7 +261,10 @@ class Connection(_mysql.connection):
         """Set the connection character set to charset. The character set can
         only be changed in MySQL-4.1 and newer. If you try to change the
         character set from the current value in an older version,
-        NotSupportedError will be raised."""
+        NotSupportedError will be raised.
+        
+        Non-standard. It is better to set the character set when creating the
+        connection using the charset parameter."""
         if self.character_set_name() != charset:
             try:
                 super(Connection, self).set_character_set(charset)
@@ -275,7 +278,10 @@ class Connection(_mysql.connection):
 
     def set_sql_mode(self, sql_mode):
         """Set the connection sql_mode. See MySQL documentation for legal
-        values."""
+        values.
+        
+        Non-standard. It is better to set this when creating the connection
+        using the sql_mode parameter."""
         if self._server_version < (4, 1):
             raise self.NotSupportedError, "server is too old to set sql_mode"
         self.query("SET SESSION sql_mode='%s'" % sql_mode)
@@ -284,8 +290,10 @@ class Connection(_mysql.connection):
     def show_warnings(self):
         """Return detailed information about warnings as a sequence of tuples
         of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
-        If your server is an earlier version, an empty sequence is
-        returned."""
+        If your server is an earlier version, an empty sequence is returned.
+        
+        Non-standard. This is invoked automatically after executing a query,
+        so you should not usually call it yourself."""
         if self._server_version < (4, 1): return ()
         self.query("SHOW WARNINGS")
         result = self.store_result()

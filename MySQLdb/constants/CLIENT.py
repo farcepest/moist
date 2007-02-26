@@ -1,11 +1,14 @@
-"""MySQL CLIENT constants
+"""
+MySQL CLIENT constants
+----------------------
 
 These constants are used when creating the connection. Use bitwise-OR
 (|) to combine options together, and pass them as the client_flags
 parameter to MySQLdb.Connection. For more information on these flags,
 see the MySQL C API documentation for mysql_real_connect().
-
 """
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
 
 LONG_PASSWORD = 1
 FOUND_ROWS = 2

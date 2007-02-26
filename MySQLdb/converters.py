@@ -1,9 +1,11 @@
-"""MySQLdb type conversion module
+"""
+MySQLdb type conversion module
+------------------------------
 
-This module handles all the type conversions for MySQL. If the default
-type conversions aren't what you need, you can make your own. The
-dictionary conversions maps some kind of type to a conversion function
-which returns the corresponding value:
+This module handles all the type conversions for MySQL. If the default type
+conversions aren't what you need, you can make your own. The dictionary
+conversions maps some kind of type to a conversion function which returns the
+corresponding value:
 
 Key: FIELD_TYPE.* (from MySQLdb.constants)
 
@@ -22,9 +24,9 @@ Conversion function:
 
     Returns: SQL literal value
 
-    Notes: Most conversion functions can ignore the dictionary, but
-           it is a required parameter. It is necessary for converting
-           things like sequences and instances.
+    Notes: Most conversion functions can ignore the dictionary, but it is a
+    required parameter. It is necessary for converting things like sequences
+    and instances.
 
 Don't modify conversions if you can avoid it. Instead, make copies
 (with the copy() method), modify the copies, and then pass them to
