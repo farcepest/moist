@@ -2,8 +2,8 @@
 
 import os
 import sys
-from distutils.core import setup
-from distutils.extension import Extension
+import ez_setup; ez_setup.use_setuptools()
+from setuptools import setup, Extension
 
 if sys.version_info < (2, 3):
     raise Error, "Python-2.3 or newer is required"
@@ -23,4 +23,5 @@ metadata['ext_modules'] = [
             ],
         **options),
     ]
+metadata['long_description'] = metadata['long_description'].replace(r'\n', '')
 setup(**metadata)
