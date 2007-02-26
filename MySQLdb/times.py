@@ -1,10 +1,14 @@
-"""times module
+"""
+times module
+------------
 
-This module provides some Date and Time classes for dealing with MySQL data.
+This module provides some help functions for dealing with MySQL data.
+Most of these you will not have to use directly.
 
-Use Python datetime module to handle date and time columns."""
+Uses Python datetime module to handle time-releated columns."""
 
 __revision__ = "$ Revision: $"[11:-2]
+__author__ = "$ Author: $"[9:-2]
 
 from time import localtime
 from datetime import date, datetime, time, timedelta
