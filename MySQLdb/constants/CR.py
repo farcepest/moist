@@ -1,9 +1,13 @@
-"""MySQL Connection Errors
+"""
+MySQL Connection Errors
+-----------------------
 
 Nearly all of these raise OperationalError. COMMANDS_OUT_OF_SYNC
 raises ProgrammingError.
 
 """
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
 
 MIN_ERROR = 2000
 MAX_ERROR = 2999

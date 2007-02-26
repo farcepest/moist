@@ -1,9 +1,12 @@
-"""MySQL FIELD_TYPE Constants
+"""
+MySQL FIELD_TYPE Constants
+--------------------------
 
 These constants represent the various column (field) types that are
 supported by MySQL.
-
 """
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
 
 DECIMAL = 0
 TINY = 1

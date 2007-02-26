@@ -1,9 +1,13 @@
-"""MySQL FLAG Constants
+"""
+MySQL FLAG Constants
+--------------------
 
 These flags are used along with the FIELD_TYPE to indicate various
 properties of columns in a result set.
 
 """
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
 
 NOT_NULL = 1
 PRI_KEY = 2

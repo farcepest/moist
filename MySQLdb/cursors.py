@@ -1,11 +1,14 @@
-"""MySQLdb Cursors
+"""
+MySQLdb Cursors
+---------------
 
 This module implements Cursors of various types for MySQLdb. By
 default, MySQLdb uses the Cursor class.
 
 """
 
-__revision__ = "$ Revision: $"[11:-2]
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
 
 import re
 INSERT_VALUES = re.compile(

@@ -1,4 +1,6 @@
 """
+MySQLdb Connections
+-------------------
 
 This module implements connections for MySQLdb. Presently there is
 only one class: Connection. Others are unlikely. However, you might
@@ -6,24 +8,22 @@ want to make your own subclasses. In most cases, you will probably
 override Connection.default_cursor with a non-standard Cursor class.
 
 """
-import cursors
-from _mysql_exceptions import Warning, Error, InterfaceError, DataError, \
-     DatabaseError, OperationalError, IntegrityError, InternalError, \
-     NotSupportedError, ProgrammingError
-import types, _mysql
+
+__revision__ = "$Revision$"[11:-2]
+__author__ = "$Author$"[9:-2]
+
+from MySQLdb.cursors import Cursor
+import _mysql
 
 
 def defaulterrorhandler(connection, cursor, errorclass, errorvalue):
     """
-
     If cursor is not None, (errorclass, errorvalue) is appended to
-    cursor.messages; otherwise it is appended to
-    connection.messages. Then errorclass is raised with errorvalue as
-    the value.
+    cursor.messages; otherwise it is appended to connection.messages. Then
+    errorclass is raised with errorvalue as the value.
 
-    You can override this with your own error handler by assigning it
-    to the instance.
-
+    You can override this with your own error handler by assigning it to the
+    instance.
     """
     error = errorclass, errorvalue
     if cursor:
@@ -39,14 +39,18 @@ class Connection(_mysql.connection):
 
     """MySQL Database Connection Object"""
 
-    default_cursor = cursors.Cursor
+    default_cursor = Cursor
+    errorhandler = defaulterrorhandler
     
+    from _mysql_exceptions import Warning, Error, InterfaceError, DataError, \
+         DatabaseError, OperationalError, IntegrityError, InternalError, \
+         NotSupportedError, ProgrammingError
+
     def __init__(self, *args, **kwargs):
         """
-
-        Create a connection to the database. It is strongly recommended
-        that you only use keyword parameters. Consult the MySQL C API
-        documentation for more information.
+        Create a connection to the database. It is strongly recommended that
+        you only use keyword parameters. Consult the MySQL C API documentation
+        for more information.
 
         host
           string, host to connect
@@ -125,12 +129,10 @@ class Connection(_mysql.connection):
         documentation for the MySQL C API for some hints on what they do.
 
         """
-        from constants import CLIENT, FIELD_TYPE
-        from converters import conversions
-        from weakref import proxy, WeakValueDictionary
+        from MySQLdb.constants import CLIENT, FIELD_TYPE
+        from MySQLdb.converters import conversions
+        from weakref import proxy
         
-        import types
-
         kwargs2 = kwargs.copy()
         
         if kwargs.has_key('conv'):
@@ -159,7 +161,8 @@ class Connection(_mysql.connection):
         sql_mode = kwargs2.pop('sql_mode', '')
 
         client_flag = kwargs.get('client_flag', 0)
-        client_version = tuple([ int(n) for n in _mysql.get_client_info().split('.')[:2] ])
+        client_version = tuple(
+            [ int(n) for n in _mysql.get_client_info().split('.')[:2] ])
         if client_version >= (4, 1):
             client_flag |= CLIENT.MULTI_STATEMENTS
         if client_version >= (5, 0):
@@ -169,10 +172,12 @@ class Connection(_mysql.connection):
 
         super(Connection, self).__init__(*args, **kwargs2)
 
-        self.encoders = dict([ (k, v) for k, v in conv.items()
-                               if type(k) is not int ])
+        self.encoders = dict(
+            [ (k, v) for k, v in conv.items()
+              if type(k) is not int ])
         
-        self._server_version = tuple([ int(n) for n in self.get_server_info().split('.')[:2] ])
+        self._server_version = tuple(
+            [ int(n) for n in self.get_server_info().split('.')[:2] ])
 
         db = proxy(self)
         def _get_string_literal():
@@ -206,8 +211,8 @@ class Connection(_mysql.connection):
             self.converter[FIELD_TYPE.VARCHAR].append((None, string_decoder))
             self.converter[FIELD_TYPE.BLOB].append((None, string_decoder))
 
-        self.encoders[types.StringType] = string_literal
-        self.encoders[types.UnicodeType] = unicode_literal
+        self.encoders[str] = string_literal
+        self.encoders[unicode] = unicode_literal
         self._transactional = self.server_capabilities & CLIENT.TRANSACTIONS
         if self._transactional:
             # PEP-249 requires autocommit to be initially off
@@ -216,101 +221,74 @@ class Connection(_mysql.connection):
         
     def cursor(self, cursorclass=None):
         """
-
-        Create a cursor on which queries may be performed. The
-        optional cursorclass parameter is used to create the
-        Cursor. By default, self.cursorclass=cursors.Cursor is
-        used.
-
+        Create a cursor on which queries may be performed. The optional
+        cursorclass parameter is used to create the Cursor. By default,
+        self.cursorclass=cursors.Cursor is used.
         """
         return (cursorclass or self.cursorclass)(self)
 
-    def __enter__(self): return self.cursor()
+    def __enter__(self):
+        return self.cursor()
     
-    def __exit__(self, exc, value, tb):
+    def __exit__(self, exc, value, traceback):
         if exc:
             self.rollback()
         else:
             self.commit()
             
-    def literal(self, o):
+    def literal(self, obj):
         """
+        If obj is a single object, returns an SQL literal as a string. If
+        obj is a non-string sequence, the items of the sequence are converted
+        and returned as a sequence.
 
-        If o is a single object, returns an SQL literal as a string.
-        If o is a non-string sequence, the items of the sequence are
-        converted and returned as a sequence.
-
-        Non-standard. For internal use; do not use this in your
-        applications.
-
+        Non-standard. For internal use; do not use this in your applications.
         """
-        return self.escape(o, self.encoders)
+        return self.escape(obj, self.encoders)
 
-    def begin(self):
-        """Explicitly begin a connection. Non-standard.
-        DEPRECATED: Will be removed in 1.3.
-        Use an SQL BEGIN statement instead."""
-        from warnings import warn
-        warn("begin() is non-standard and will be removed in 1.3",
-             DeprecationWarning, 2)
-        self.query("BEGIN")
-        
     if not hasattr(_mysql.connection, 'warning_count'):
 
         def warning_count(self):
-            """Return the number of warnings generated from the
-            last query. This is derived from the info() method."""
-            from string import atoi
+            """Return the number of warnings generated from the last query.
+            This is derived from the info() method."""
             info = self.info()
             if info:
-                return atoi(info.split()[-1])
+                return int(info.split()[-1])
             else:
                 return 0
 
     def set_character_set(self, charset):
-        """Set the connection character set to charset. The character
-        set can only be changed in MySQL-4.1 and newer. If you try
-        to change the character set from the current value in an
-        older version, NotSupportedError will be raised."""
+        """Set the connection character set to charset. The character set can
+        only be changed in MySQL-4.1 and newer. If you try to change the
+        character set from the current value in an older version,
+        NotSupportedError will be raised."""
         if self.character_set_name() != charset:
             try:
                 super(Connection, self).set_character_set(charset)
             except AttributeError:
                 if self._server_version < (4, 1):
-                    raise NotSupportedError, "server is too old to set charset"
+                    raise self.NotSupportedError, "server is too old to set charset"
                 self.query('SET NAMES %s' % charset)
                 self.store_result()
         self.string_decoder.charset = charset
         self.unicode_literal.charset = charset
 
     def set_sql_mode(self, sql_mode):
-        """Set the connection sql_mode. See MySQL documentation for
-        legal values."""
+        """Set the connection sql_mode. See MySQL documentation for legal
+        values."""
         if self._server_version < (4, 1):
-            raise NotSupportedError, "server is too old to set sql_mode"
+            raise self.NotSupportedError, "server is too old to set sql_mode"
         self.query("SET SESSION sql_mode='%s'" % sql_mode)
         self.store_result()
         
     def show_warnings(self):
-        """Return detailed information about warnings as a
-        sequence of tuples of (Level, Code, Message). This
-        is only supported in MySQL-4.1 and up. If your server
-        is an earlier version, an empty sequence is returned."""
-        if self._server_version < (4,1): return ()
+        """Return detailed information about warnings as a sequence of tuples
+        of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
+        If your server is an earlier version, an empty sequence is
+        returned."""
+        if self._server_version < (4, 1): return ()
         self.query("SHOW WARNINGS")
-        r = self.store_result()
-        warnings = r.fetch_row(0)
+        result = self.store_result()
+        warnings = result.fetch_row(0)
         return warnings
     
-    Warning = Warning
-    Error = Error
-    InterfaceError = InterfaceError
-    DatabaseError = DatabaseError
-    DataError = DataError
-    OperationalError = OperationalError
-    IntegrityError = IntegrityError
-    InternalError = InternalError
-    ProgrammingError = ProgrammingError
-    NotSupportedError = NotSupportedError
-
-    errorhandler = defaulterrorhandler
