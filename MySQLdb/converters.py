@@ -114,13 +114,14 @@ conversions = {
     dict: escape_dict,
     InstanceType: instance_to_sql,
     array.array: array_to_sql,
-    str: object_to_quoted_sql, # default
     unicode: unicode_to_sql,
     object: instance_to_sql,
     bool: bool_to_sql,
     datetime.datetime: datetime_to_sql,
     datetime.timedelta: timedelta_to_sql,
     Set: Set_to_sql,
+    str: object_to_quoted_sql, # default
+    
     FIELD_TYPE.TINY: int,
     FIELD_TYPE.SHORT: int,
     FIELD_TYPE.LONG: long,
