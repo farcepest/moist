@@ -32,101 +32,95 @@ MySQL.connect().
 
 """
 
-from _mysql import string_literal, escape_sequence, escape_dict, escape, NULL
-from constants import FIELD_TYPE, FLAG
-from sets import BaseSet, Set
-from times import *
-import types
+from _mysql import string_literal, escape_sequence, escape_dict, NULL
+from MySQLdb.constants import FIELD_TYPE, FLAG
+from sets import Set
+from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
+     timedelta_or_None, datetime_or_None, date_or_None, \
+     mysql_timestamp_converter
+from types import InstanceType
 import array
+import datetime
 
-def Bool2Str(s, d): return str(int(s))
+__revision__ = "$ Revision: $"[11:-2]
 
-def Str2Set(s):
-    return Set([ i for i in s.split(',') if i ])
+def bool_to_sql(boolean, conv):
+    """Convert a Python bool to an SQL literal."""
+    return str(int(boolean))
 
-def Set2Str(s, d):
-    return string_literal(','.join(s), d)
+def SET_to_Set(value):
+    """Convert MySQL SET column to Python Set."""
+    return Set([ i for i in value.split(',') if i ])
+
+def Set_to_sql(set, conv):
+    """Convert a Python Set to an SQL literal."""
+    return string_literal(','.join(set), conv)
     
-def Thing2Str(s, d):
+def object_to_sql(obj, conv):
     """Convert something into a string via str()."""
-    return str(s)
+    return str(obj)
 
-def Unicode2Str(s, d):
+def unicode_to_sql(value, conv):
     """Convert a unicode object to a string using the default encoding.
     This is only used as a placeholder for the real function, which
     is connection-dependent."""
-    return s.encode()
+    assert isinstance(value, unicode)
+    return value.encode()
 
-Long2Int = Thing2Str
+def float_to_sql(value, conv):
+    return '%.15g' % value
 
-def Float2Str(o, d):
-    return '%.15g' % o
-
-def None2NULL(o, d):
+def None_to_sql(value, conv):
     """Convert None to NULL."""
     return NULL # duh
 
-def Thing2Literal(o, d):
-    
+def object_to_quoted_sql(obj, conv):
     """Convert something into a SQL string literal.  If using
     MySQL-3.23 or newer, string_literal() is a method of the
     _mysql.MYSQL object, and this function will be overridden with
     that method when the connection is created."""
 
-    return string_literal(o, d)
+    return string_literal(obj, conv)
 
-
-def Instance2Str(o, d):
-
-    """
-
-    Convert an Instance to a string representation.  If the __str__()
+def instance_to_sql(obj, conv):
+    """Convert an Instance to a string representation.  If the __str__()
     method produces acceptable output, then you don't need to add the
     class to conversions; it will be handled by the default
-    converter. If the exact class is not found in d, it will use the
-    first class it can find for which o is an instance.
-
+    converter. If the exact class is not found in conv, it will use the
+    first class it can find for which obj is an instance.
     """
+    if obj.__class__ in conv:
+        return conv[obj.__class__](obj, conv)
+    classes = [ key for key in conv.keys()
+                if isinstance(obj, key) ]
+    if not classes:
+        return conv[types.StringType](obj, conv)
+    conv[obj.__class__] = conv[classes[0]]
+    return conv[classes[0]](obj, conv)
 
-    if d.has_key(o.__class__):
-        return d[o.__class__](o, d)
-    cl = filter(lambda x,o=o:
-                type(x) is types.ClassType
-                and isinstance(o, x), d.keys())
-    if not cl and hasattr(types, 'ObjectType'):
-        cl = filter(lambda x,o=o:
-                    type(x) is types.TypeType
-                    and isinstance(o, x)
-                    and d[x] is not Instance2Str,
-                    d.keys())
-    if not cl:
-        return d[types.StringType](o,d)
-    d[o.__class__] = d[cl[0]]
-    return d[cl[0]](o, d)
+def char_array(obj):
+    return array.array('c', obj)
 
-def char_array(s):
-    return array.array('c', s)
-
-def array2Str(o, d):
-    return Thing2Literal(o.tostring(), d)
+def array_to_sql(obj, conv):
+    return object_to_quoted_sql(obj.tostring(), conv)
 
 conversions = {
-    types.IntType: Thing2Str,
-    types.LongType: Long2Int,
-    types.FloatType: Float2Str,
-    types.NoneType: None2NULL,
-    types.TupleType: escape_sequence,
-    types.ListType: escape_sequence,
-    types.DictType: escape_dict,
-    types.InstanceType: Instance2Str,
-    array.ArrayType: array2Str,
-    types.StringType: Thing2Literal, # default
-    types.UnicodeType: Unicode2Str,
-    types.ObjectType: Instance2Str,
-    types.BooleanType: Bool2Str,
-    DateTimeType: DateTime2literal,
-    DateTimeDeltaType: DateTimeDelta2literal,
-    Set: Set2Str,
+    int: object_to_sql,
+    long: object_to_sql,
+    float: float_to_sql,
+    type(None): None_to_sql,
+    tuple: escape_sequence,
+    list: escape_sequence,
+    dict: escape_dict,
+    InstanceType: instance_to_sql,
+    array.array: array_to_sql,
+    str: object_to_quoted_sql, # default
+    unicode: unicode_to_sql,
+    object: instance_to_sql,
+    bool: bool_to_sql,
+    datetime.datetime: datetime_to_sql,
+    datetime.timedelta: timedelta_to_sql,
+    Set: Set_to_sql,
     FIELD_TYPE.TINY: int,
     FIELD_TYPE.SHORT: int,
     FIELD_TYPE.LONG: long,
@@ -137,11 +131,11 @@ conversions = {
     FIELD_TYPE.LONGLONG: long,
     FIELD_TYPE.INT24: int,
     FIELD_TYPE.YEAR: int,
-    FIELD_TYPE.SET: Str2Set,
+    FIELD_TYPE.SET: SET_to_Set,
     FIELD_TYPE.TIMESTAMP: mysql_timestamp_converter,
-    FIELD_TYPE.DATETIME: DateTime_or_None,
-    FIELD_TYPE.TIME: TimeDelta_or_None,
-    FIELD_TYPE.DATE: Date_or_None,
+    FIELD_TYPE.DATETIME: datetime_or_None,
+    FIELD_TYPE.TIME: timedelta_or_None,
+    FIELD_TYPE.DATE: date_or_None,
     FIELD_TYPE.BLOB: [
         (FLAG.BINARY, str),
         ],

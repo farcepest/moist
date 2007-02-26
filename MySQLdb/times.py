@@ -4,96 +4,152 @@ This module provides some Date and Time classes for dealing with MySQL data.
 
 Use Python datetime module to handle date and time columns."""
 
+__revision__ = "$ Revision: $"[11:-2]
+
 from time import localtime
 from datetime import date, datetime, time, timedelta
 from _mysql import string_literal
 
+# These are required for DB-API (PEP-249)
 Date = date
 Time = time
 TimeDelta = timedelta
 Timestamp = datetime
 
-DateTimeDeltaType = timedelta
-DateTimeType = datetime
-
 def DateFromTicks(ticks):
-    """Convert UNIX ticks into a date instance."""
+    """Convert UNIX ticks into a date instance.
+    
+      >>> DateFromTicks(1172466380)
+      datetime.date(2007, 2, 25)
+    
+    """
     return date(*localtime(ticks)[:3])
 
 def TimeFromTicks(ticks):
-    """Convert UNIX ticks into a time instance."""
+    """Convert UNIX ticks into a time instance.
+    
+      >>> TimeFromTicks(1172466380)
+      datetime.time(23, 6, 20)
+    
+    """
     return time(*localtime(ticks)[3:6])
 
 def TimestampFromTicks(ticks):
-    """Convert UNIX ticks into a datetime instance."""
+    """Convert UNIX ticks into a datetime instance.
+    
+      >>> TimestampFromTicks(1172466380)
+      datetime.datetime(2007, 2, 25, 23, 6, 20)
+    
+    """
     return datetime(*localtime(ticks)[:6])
 
 format_TIME = format_DATE = str
 
-def format_TIMEDELTA(v):
-    seconds = int(v.seconds) % 60
-    minutes = int(v.seconds / 60) % 60
-    hours = int(v.seconds / 3600) % 24
-    return '%d %d:%d:%d' % (v.days, hours, minutes, seconds)
+def format_TIMEDELTA(obj):
+    """Format a TIMEDELTA as a string.
+    
+      >>> format_TIMEDELTA(timedelta(seconds=-86400))
+      '-1 00:00:00'
+      >>> format_TIMEDELTA(timedelta(hours=73, minutes=15, seconds=32))
+      '3 01:15:32'
+      
+    """
+    seconds = int(obj.seconds) % 60
+    minutes = int(obj.seconds / 60) % 60
+    hours = int(obj.seconds / 3600) % 24
+    return '%d %02d:%02d:%02d' % (obj.days, hours, minutes, seconds)
 
-def format_TIMESTAMP(d):
-    return d.strftime("%Y-%m-%d %H:%M:%S")
+def format_TIMESTAMP(obj):
+    return obj.strftime("%Y-%m-%d %H:%M:%S")
 
-
-def DateTime_or_None(s):
-    if ' ' in s:
+def datetime_or_None(obj):
+    if ' ' in obj:
         sep = ' '
-    elif 'T' in s:
+    elif 'T' in obj:
         sep = 'T'
     else:
-        return Date_or_None(s)
+        return date_or_None(obj)
 
     try:
-        d, t = s.split(sep, 1)
-        return datetime(*[ int(x) for x in d.split('-')+t.split(':') ])
-    except:
-        return Date_or_None(s)
+        ymd, hms = obj.split(sep, 1)
+        return datetime(*[ int(x) for x in ymd.split('-')+hms.split(':') ])
+    except ValueError:
+        return date_or_None(obj)
 
-def TimeDelta_or_None(s):
+def timedelta_or_None(obj):
     from math import modf
     try:
-        h, m, s = s.split(':')
-        td = timedelta(hours=int(h), minutes=int(m), seconds=int(float(s)),
-                       microseconds=int(modf(float(s))[0]*1000000))
-        if h < 0:
-            return -td
+        hours, minutes, seconds = obj.split(':')
+        tdelta = timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds),
+                           microseconds=int(modf(float(seconds))[0]*1000000))
+        if hours < 0:
+            return -tdelta
         else:
-            return td
-    except:
+            return tdelta
+    except ValueError:
         return None
 
-def Time_or_None(s):
+def time_or_None(obj):
     from math import modf
     try:
-        h, m, s = s.split(':')
-        return time(hour=int(h), minute=int(m), second=int(float(s)),
-                    microsecond=int(modf(float(s))[0]*1000000))
-    except:
+        hour, minute, second = obj.split(':')
+        return time(hour=int(hour), minute=int(minute), second=int(second),
+                    microsecond=int(modf(float(second))[0]*1000000))
+    except ValueError:
         return None
 
-def Date_or_None(s):
-    try: return date(*[ int(x) for x in s.split('-',2)])
-    except: return None
+def date_or_None(obj):
+    try:
+        return date(*[ int(x) for x in obj.split('-',2)])
+    except ValueError:
+        return None
 
-def DateTime2literal(d, c):
+def datetime_to_sql(obj, conv):
     """Format a DateTime object as an ISO timestamp."""
-    return string_literal(format_TIMESTAMP(d),c)
+    return string_literal(format_TIMESTAMP(obj), conv)
     
-def DateTimeDelta2literal(d, c):
-    """Format a DateTimeDelta object as a time."""
-    return string_literal(format_TIMEDELTA(d),c)
+def timedelta_to_sql(obj, conv):
+    """Format a timedelta as an SQL literal.
+    
+      >>> timedelta_to_sql(timedelta(hours=73, minutes=15, seconds=32), {})
+      "'3 01:15:32'"
+      
+    """
+    return string_literal(format_TIMEDELTA(obj), conv)
 
-def mysql_timestamp_converter(s):
-    """Convert a MySQL TIMESTAMP to a Timestamp object."""
-    # MySQL>4.1 returns TIMESTAMP in the same format as DATETIME
-    if s[4] == '-': return DateTime_or_None(s)
-    s = s + "0"*(14-len(s)) # padding
-    parts = map(int, filter(None, (s[:4],s[4:6],s[6:8],
-                                   s[8:10],s[10:12],s[12:14])))
-    try: return Timestamp(*parts)
-    except: return None
+def mysql_timestamp_converter(timestamp):
+    """Convert a MySQL TIMESTAMP to a Timestamp object.
+
+    MySQL>4.1 returns TIMESTAMP in the same format as DATETIME:
+    
+      >>> mysql_timestamp_converter('2007-02-25 22:32:17')
+      datetime.datetime(2007, 2, 25, 22, 32, 17)
+    
+    MySQL<4.1 uses a big string of numbers:
+    
+      >>> mysql_timestamp_converter('20070225223217')
+      datetime.datetime(2007, 2, 25, 22, 32, 17)
+    
+    Illegal values are returned as None:
+    
+      >>> print mysql_timestamp_converter('2007-02-31 22:32:17')
+      None
+      >>> print mysql_timestamp_converter('00000000000000')
+      None
+      
+    """
+    if timestamp[4] == '-':
+        return datetime_or_None(timestamp)
+    timestamp += "0"*(14-len(timestamp)) # padding
+    year, month, day, hour, minute, second = \
+        int(timestamp[:4]), int(timestamp[4:6]), int(timestamp[6:8]), \
+        int(timestamp[8:10]), int(timestamp[10:12]), int(timestamp[12:14])
+    try:
+        return datetime(year, month, day, hour, minute, second)
+    except ValueError:
+        return None
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
+    
