@@ -18,19 +18,14 @@ MySQLdb.converters module.
 
 __revision__ = """$Revision$"""[11:-2]
 from MySQLdb.release import __version__, version_info, __author__
-
-import _mysql
-
-if version_info != _mysql.version_info:
-    raise ImportError, \
-          "this is MySQLdb version %s, but _mysql is version %r" % \
-          (version_info, _mysql.version_info)
+from MySQLdb.exceptions import Warning, Error, InterfaceError, DataError, \
+     DatabaseError, OperationalError, IntegrityError, InternalError, \
+     NotSupportedError, ProgrammingError
 
 threadsafety = 1
 apilevel = "2.0"
 paramstyle = "format"
 
-from _mysql import *
 from MySQLdb.constants import FIELD_TYPE
 from MySQLdb.times import Date, Time, Timestamp, \
     DateFromTicks, TimeFromTicks, TimestampFromTicks
@@ -42,6 +37,7 @@ class DBAPISet(ImmutableSet):
     """A special type of set for which A == x is True if A is a
     DBAPISet and x is a member of that set.
     
+      >>> from MySQLdb.constants import FIELD_TYPE
       >>> FIELD_TYPE.VAR_STRING == STRING
       True
       >>> FIELD_TYPE.DATE == NUMBER
@@ -90,15 +86,17 @@ def Connect(*args, **kwargs):
 
 connect = Connection = Connect
 
-__all__ = [ 'BINARY', 'Binary', 'Connect', 'Connection', 'DATE', 'Date',
-            'Time', 'Timestamp', 'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
-            'DataError', 'DatabaseError', 'Error', 'FIELD_TYPE', 'IntegrityError',
-            'InterfaceError', 'InternalError', 'MySQLError', 'NULL', 'NUMBER',
-            'NotSupportedError', 'DBAPISet', 'OperationalError', 'ProgrammingError',
-            'ROWID', 'STRING', 'TIME', 'TIMESTAMP', 'Warning', 'apilevel', 'connect',
-            'connections', 'constants', 'converters', 'cursors', 'debug', 'escape',
-            'escape_dict', 'escape_sequence', 'escape_string', 'get_client_info',
-            'paramstyle', 'string_literal', 'threadsafety', 'version_info']
+__all__ = [
+    'BINARY', 'Binary', 'Connect', 'Connection', 'DATE', 'Date',
+    'Time', 'Timestamp', 'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
+    'DataError', 'DatabaseError', 'Error', 'FIELD_TYPE', 'IntegrityError',
+    'InterfaceError', 'InternalError', 'MySQLError', 'NULL', 'NUMBER',
+    'NotSupportedError', 'DBAPISet', 'OperationalError', 'ProgrammingError',
+    'ROWID', 'STRING', 'TIME', 'TIMESTAMP', 'Warning', 'apilevel', 'connect',
+    'connections', 'constants', 'converters', 'cursors', 'debug', 'escape',
+    'escape_dict', 'escape_sequence', 'escape_string', 'get_client_info',
+    'paramstyle', 'string_literal', 'threadsafety', 'version_info',
+    ]
 
 
 if __name__ == "__main__":

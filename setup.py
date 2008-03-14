@@ -20,6 +20,7 @@ metadata['ext_modules'] = [
             '_mysql.c',
             '_mysql_connections.c',
             '_mysql_results.c',
+            '_mysql_fields.c',
             ],
         **options),
     ]

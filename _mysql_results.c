@@ -156,7 +156,46 @@ _mysql_ResultObject_describe(
 	Py_XDECREF(d);
 	return NULL;
 }
-	
+
+static char _mysql_ResultObject_fields__doc__[] =
+"Returns the sequence of 7-tuples required by the DB-API for\n\
+the Cursor.description attribute.\n\
+";
+
+static PyObject *
+_mysql_ResultObject_fields(
+	_mysql_ResultObject *self,
+	PyObject *args)
+{
+	PyObject *arglist=NULL, *kwarglist=NULL;
+	PyObject *fields=NULL;
+	_mysql_FieldObject *field=NULL;
+	unsigned int i, n;
+	if (!PyArg_ParseTuple(args, "")) return NULL;
+	check_result_connection(self);
+	kwarglist = PyDict_New();
+	if (!kwarglist) goto error;
+	n = mysql_num_fields(self->result);
+	if (!(fields = PyTuple_New(n))) return NULL;
+	for (i=0; i<n; i++) {
+		arglist = Py_BuildValue("(Oi)", self, i);
+		if (!arglist) goto error;
+		field = MyAlloc(_mysql_FieldObject, _mysql_FieldObject_Type);
+		if (!field) goto error;
+		if (_mysql_FieldObject_Initialize(field, arglist, kwarglist))
+			goto error;
+		Py_DECREF(arglist);
+		PyTuple_SET_ITEM(fields, i, (PyObject *) field);
+	}
+	Py_DECREF(kwarglist);
+	return fields;
+  error:
+	Py_XDECREF(arglist);
+	Py_XDECREF(kwarglist);
+	Py_XDECREF(fields);
+	return NULL;
+}
+		
 static char _mysql_ResultObject_field_flags__doc__[] =
 "Returns a tuple of field flags, one for each column in the result.\n\
 " ;
@@ -552,6 +591,12 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 		(PyCFunction)_mysql_ResultObject_describe,
 		METH_VARARGS,
 		_mysql_ResultObject_describe__doc__
+	},
+	{
+		"fields",
+		(PyCFunction)_mysql_ResultObject_fields,
+		METH_VARARGS,
+		_mysql_ResultObject_fields__doc__
 	},
 	{
 		"fetch_row",

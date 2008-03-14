@@ -1,11 +1,24 @@
-"""_mysql_exceptions: Exception classes for _mysql and MySQLdb.
+"""
+MySQLdb.exceptions
+==================
 
 These classes are dictated by the DB API v2.0:
 
     http://www.python.org/topics/database/DatabaseAPI-2.0.html
 """
 
-from exceptions import Exception, StandardError, Warning
+# from __future__ import absolute_import
+# Unfortunately, you cannot put the above in a conditional statement.
+# It would make things much cleaner for Python-2.5, but breaks older.
+
+try:
+    from exceptions import Exception, StandardError, Warning
+except ImportError:
+    import sys
+    e = sys.modules['exceptions']
+    StandardError = e.StandardError
+    Warning = e.Warning
+    
 from MySQLdb.constants import ER
 
 class MySQLError(StandardError):
@@ -88,8 +101,9 @@ def _map_error(exc, *errors):
         error_map[error] = exc
 
 _map_error(ProgrammingError, ER.DB_CREATE_EXISTS, ER.SYNTAX_ERROR,
-           ER.PARSE_ERROR, ER.NO_SUCH_TABLE, ER.WRONG_DB_NAME, ER.WRONG_TABLE_NAME,
-           ER.FIELD_SPECIFIED_TWICE, ER.INVALID_GROUP_FUNC_USE, ER.UNSUPPORTED_EXTENSION,
+           ER.PARSE_ERROR, ER.NO_SUCH_TABLE, ER.WRONG_DB_NAME,
+           ER.WRONG_TABLE_NAME, ER.FIELD_SPECIFIED_TWICE,
+           ER.INVALID_GROUP_FUNC_USE, ER.UNSUPPORTED_EXTENSION,
            ER.TABLE_MUST_HAVE_COLUMNS, ER.CANT_DO_THIS_DURING_AN_TRANSACTION)
 _map_error(DataError, ER.WARN_DATA_TRUNCATED, ER.WARN_NULL_TO_NOTNULL,
            ER.WARN_DATA_OUT_OF_RANGE, ER.NO_DEFAULT, ER.PRIMARY_CANT_HAVE_NULL,
@@ -97,7 +111,7 @@ _map_error(DataError, ER.WARN_DATA_TRUNCATED, ER.WARN_NULL_TO_NOTNULL,
 _map_error(IntegrityError, ER.DUP_ENTRY, ER.NO_REFERENCED_ROW,
            ER.NO_REFERENCED_ROW_2, ER.ROW_IS_REFERENCED, ER.ROW_IS_REFERENCED_2,
            ER.CANNOT_ADD_FOREIGN)
-_map_error(NotSupportedError, ER.WARNING_NOT_COMPLETE_ROLLBACK, ER.NOT_SUPPORTED_YET,
-           ER.FEATURE_DISABLED, ER.UNKNOWN_STORAGE_ENGINE)
+_map_error(NotSupportedError, ER.WARNING_NOT_COMPLETE_ROLLBACK,
+           ER.NOT_SUPPORTED_YET, ER.FEATURE_DISABLED, ER.UNKNOWN_STORAGE_ENGINE)
 
-del Exception, StandardError, _map_error, ER
+del StandardError, _map_error, ER

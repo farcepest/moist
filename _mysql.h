@@ -57,6 +57,15 @@ typedef struct {
 
 extern PyTypeObject _mysql_ResultObject_Type;
 
+typedef struct {
+	PyObject_HEAD
+	PyObject *result;
+	MYSQL_FIELD field;
+	unsigned int index;
+} _mysql_FieldObject;
+
+extern PyTypeObject _mysql_FieldObject_Type;
+
 int _mysql_server_init_done;
 #if MYSQL_VERSION_ID >= 40000
 #define check_server_init(x) if (!_mysql_server_init_done) { if (mysql_server_init(0, NULL, NULL)) { _mysql_Exception(NULL); return x; } else { _mysql_server_init_done = 1;} }
@@ -64,18 +73,18 @@ int _mysql_server_init_done;
 #define check_server_init(x) if (!_mysql_server_init_done) _mysql_server_init_done = 1
 #endif
 
-PyObject *_mysql_MySQLError;
- PyObject *_mysql_Warning;
- PyObject *_mysql_Error;
- PyObject *_mysql_DatabaseError;
- PyObject *_mysql_InterfaceError; 
- PyObject *_mysql_DataError;
- PyObject *_mysql_OperationalError; 
- PyObject *_mysql_IntegrityError; 
- PyObject *_mysql_InternalError; 
- PyObject *_mysql_ProgrammingError;
- PyObject *_mysql_NotSupportedError;
-PyObject *_mysql_error_map;
+extern PyObject *_mysql_MySQLError;
+extern PyObject *_mysql_Warning;
+extern PyObject *_mysql_Error;
+extern PyObject *_mysql_DatabaseError;
+extern PyObject *_mysql_InterfaceError; 
+extern PyObject *_mysql_DataError;
+extern PyObject *_mysql_OperationalError; 
+extern PyObject *_mysql_IntegrityError; 
+extern PyObject *_mysql_InternalError; 
+extern PyObject *_mysql_ProgrammingError;
+extern PyObject *_mysql_NotSupportedError;
+extern PyObject *_mysql_error_map;
 
 extern PyObject *
 _mysql_Exception(_mysql_ConnectionObject *c);
@@ -83,5 +92,11 @@ _mysql_Exception(_mysql_ConnectionObject *c);
 extern int
 _mysql_ResultObject_Initialize(
 	_mysql_ResultObject *self,
+	PyObject *args,
+	PyObject *kwargs);
+
+extern int
+_mysql_FieldObject_Initialize(
+	_mysql_FieldObject *self,
 	PyObject *args,
 	PyObject *kwargs);

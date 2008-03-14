@@ -1,7 +1,17 @@
 #include "_mysql.h"
 
-extern PyTypeObject _mysql_ConnectionObject_Type;
-extern PyTypeObject _mysql_ResultObject_Type;
+PyObject *_mysql_MySQLError;
+ PyObject *_mysql_Warning;
+ PyObject *_mysql_Error;
+  PyObject *_mysql_DatabaseError;
+  PyObject *_mysql_InterfaceError; 
+  PyObject *_mysql_DataError;
+  PyObject *_mysql_OperationalError; 
+  PyObject *_mysql_IntegrityError; 
+  PyObject *_mysql_InternalError; 
+  PyObject *_mysql_ProgrammingError;
+  PyObject *_mysql_NotSupportedError;
+PyObject *_mysql_error_map;
 
 int _mysql_server_init_done = 0;
 
@@ -439,6 +449,7 @@ init_mysql(void)
 	if (!module) return; /* this really should never happen */
 	_mysql_ConnectionObject_Type.ob_type = &PyType_Type;
 	_mysql_ResultObject_Type.ob_type = &PyType_Type;
+	_mysql_FieldObject_Type.ob_type = &PyType_Type;
 #if PY_VERSION_HEX >= 0x02020000
 	_mysql_ConnectionObject_Type.tp_alloc = PyType_GenericAlloc;
 	_mysql_ConnectionObject_Type.tp_new = PyType_GenericNew;
@@ -446,6 +457,9 @@ init_mysql(void)
 	_mysql_ResultObject_Type.tp_alloc = PyType_GenericAlloc;
 	_mysql_ResultObject_Type.tp_new = PyType_GenericNew;
 	_mysql_ResultObject_Type.tp_free = _PyObject_GC_Del;
+	_mysql_FieldObject_Type.tp_alloc = PyType_GenericAlloc;
+	_mysql_FieldObject_Type.tp_new = PyType_GenericNew;
+	_mysql_FieldObject_Type.tp_free = _PyObject_GC_Del;
 #endif
 
 	if (!(dict = PyModule_GetDict(module))) goto error;
@@ -464,7 +478,11 @@ init_mysql(void)
 			       (PyObject *)&_mysql_ResultObject_Type))
 		goto error;	
 	Py_INCREF(&_mysql_ResultObject_Type);
-	if (!(emod = PyImport_ImportModule("_mysql_exceptions")))
+	if (PyDict_SetItemString(dict, "field",
+			       (PyObject *)&_mysql_FieldObject_Type))
+		goto error;	
+	Py_INCREF(&_mysql_FieldObject_Type);
+	if (!(emod = PyImport_ImportModule("MySQLdb.exceptions")))
 		goto error;
 	if (!(edict = PyModule_GetDict(emod))) goto error;
 	if (!(_mysql_MySQLError =

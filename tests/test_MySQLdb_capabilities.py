@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-import test_capabilities
+import capabilities
 import unittest
 import MySQLdb
 import warnings
 
 warnings.filterwarnings('error')
 
-class test_MySQLdb(test_capabilities.DatabaseTest):
+class test_MySQLdb(capabilities.DatabaseTest):
 
     db_module = MySQLdb
     connect_args = ()
@@ -40,27 +40,28 @@ class test_MySQLdb(test_capabilities.DatabaseTest):
     def test_stored_procedures(self):
         db = self.connection
         c = self.cursor
-        self.create_table(('pos INT', 'tree CHAR(20)'))
-        c.executemany("INSERT INTO %s (pos,tree) VALUES (%%s,%%s)" % self.table,
-                      list(enumerate('ash birch cedar larch pine'.split())))
-        db.commit()
-        
-        c.execute("""
-        CREATE PROCEDURE test_sp(IN t VARCHAR(255))
-        BEGIN
-            SELECT pos FROM %s WHERE tree = t;
-        END
-        """ % self.table)
-        db.commit()
-
-        c.callproc('test_sp', ('larch',))
-        rows = c.fetchall()
-        self.assertEquals(len(rows), 1)
-        self.assertEquals(rows[0][0], 3)
-        c.nextset()
-        
-        c.execute("DROP PROCEDURE test_sp")
-        c.execute('drop table %s' % (self.table))
+        try:
+            self.create_table(('pos INT', 'tree CHAR(20)'))
+            c.executemany("INSERT INTO %s (pos,tree) VALUES (%%s,%%s)" % self.table,
+                          list(enumerate('ash birch cedar larch pine'.split())))
+            db.commit()
+            
+            c.execute("""
+            CREATE PROCEDURE test_sp(IN t VARCHAR(255))
+            BEGIN
+                SELECT pos FROM %s WHERE tree = t;
+            END
+            """ % self.table)
+            db.commit()
+    
+            c.callproc('test_sp', ('larch',))
+            rows = c.fetchall()
+            self.assertEquals(len(rows), 1)
+            self.assertEquals(rows[0][0], 3)
+            c.nextset()
+        finally:
+            c.execute("DROP PROCEDURE IF EXISTS test_sp")
+            c.execute('drop table %s' % (self.table))
 
     def test_small_CHAR(self):
         # Character data

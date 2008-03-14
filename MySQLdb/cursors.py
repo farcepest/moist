@@ -35,7 +35,7 @@ class BaseCursor(object):
 
     """
 
-    from _mysql_exceptions import MySQLError, Warning, Error, InterfaceError, \
+    from MySQLdb.exceptions import MySQLError, Warning, Error, InterfaceError, \
          DatabaseError, DataError, OperationalError, IntegrityError, \
          InternalError, ProgrammingError, NotSupportedError
     
@@ -68,7 +68,10 @@ class BaseCursor(object):
         """Close the cursor. No further queries will be possible."""
         if not self.connection:
             return
-        while self.nextset():
+        try:
+            while self.nextset():
+                pass
+        except:
             pass
         self.connection = None
 
@@ -142,7 +145,7 @@ class BaseCursor(object):
         Raises ProgrammingError if the connection has been closed."""
         if not self.connection:
             self.errorhandler(self, self.ProgrammingError, "cursor closed")
-        return self.connection
+        return self.connection._db
     
     def execute(self, query, args=None):
         """Execute a query.
@@ -159,12 +162,12 @@ class BaseCursor(object):
         """
         from sys import exc_info
         del self.messages[:]
-        connection = self._get_db()
-        charset = connection.character_set_name()
+        db = self._get_db()
+        charset = db.character_set_name()
         if isinstance(query, unicode):
             query = query.encode(charset)
         if args is not None:
-            query = query % connection.literal(args)
+            query = query % self.connection.literal(args)
         try:
             result = self._query(query)
         except TypeError, msg:
@@ -205,10 +208,10 @@ class BaseCursor(object):
 
         """
         del self.messages[:]
-        connection = self._get_db()
+        db = self._get_db()
         if not args:
             return
-        charset = connection.character_set_name()
+        charset = self.connection.character_set_name()
         if isinstance(query, unicode):
             query = query.encode(charset)
         matched = INSERT_VALUES.match(query)
@@ -221,7 +224,7 @@ class BaseCursor(object):
         values = matched.group('values')
  
         try:
-            sql_params = [ values % connection.literal(arg) for arg in args ]
+            sql_params = [ values % self.connection.literal(arg) for arg in args ]
         except TypeError, msg:
             if msg.args[0] in ("not enough arguments for format string",
                                "not all arguments converted"):
@@ -273,11 +276,11 @@ class BaseCursor(object):
         disconnected.
         """
 
-        connection = self._get_db()
-        charset = connection.character_set_name()
+        db = self._get_db()
+        charset = self.connection.character_set_name()
         for index, arg in enumerate(args):
             query = "SET @_%s_%d=%s" % (procname, index,
-                                        connection.literal(arg))
+                                        self.connection.literal(arg))
             if isinstance(query, unicode):
                 query = query.encode(charset)
             self._query(query)
@@ -297,7 +300,7 @@ class BaseCursor(object):
     def _do_query(self, query):
         """Low-levey query wrapper. Overridden by MixIns."""
         connection = self._get_db()
-        self._last_executed = query
+        self._executed = query
         connection.query(query)
         self._do_get_result()
         return self.rowcount

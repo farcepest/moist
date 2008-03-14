@@ -12,9 +12,6 @@ override Connection.default_cursor with a non-standard Cursor class.
 __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
 
-from MySQLdb.cursors import Cursor
-import _mysql
-
 
 def defaulterrorhandler(connection, cursor, errorclass, errorvalue):
     """
@@ -35,14 +32,13 @@ def defaulterrorhandler(connection, cursor, errorclass, errorvalue):
     raise errorclass, errorvalue
 
 
-class Connection(_mysql.connection):
+class Connection(object):
 
     """MySQL Database Connection Object"""
 
-    default_cursor = Cursor
     errorhandler = defaulterrorhandler
     
-    from _mysql_exceptions import Warning, Error, InterfaceError, DataError, \
+    from MySQLdb.exceptions import Warning, Error, InterfaceError, DataError, \
          DatabaseError, OperationalError, IntegrityError, InternalError, \
          NotSupportedError, ProgrammingError
 
@@ -131,6 +127,8 @@ class Connection(_mysql.connection):
         """
         from MySQLdb.constants import CLIENT, FIELD_TYPE
         from MySQLdb.converters import conversions
+        from MySQLdb.cursors import Cursor
+        import _mysql
         from weakref import proxy
         
         kwargs2 = kwargs.copy()
@@ -147,9 +145,9 @@ class Connection(_mysql.connection):
                     conv2[k] = v[:]
                 else:
                     conv2[k] = v
-        kwargs2['conv'] = conv2
+        #kwargs2['conv'] = conv2
 
-        self.cursorclass = kwargs2.pop('cursorclass', self.default_cursor)
+        self.cursorclass = kwargs2.pop('cursorclass', Cursor)
         charset = kwargs2.pop('charset', '')
 
         if charset:
@@ -170,24 +168,24 @@ class Connection(_mysql.connection):
             
         kwargs2['client_flag'] = client_flag
 
-        super(Connection, self).__init__(*args, **kwargs2)
+        self._db = _mysql.connection(*args, **kwargs2)
 
         self.encoders = dict(
             [ (k, v) for k, v in conv.items()
               if type(k) is not int ])
         
         self._server_version = tuple(
-            [ int(n) for n in self.get_server_info().split('.')[:2] ])
+            [ int(n) for n in self._db.get_server_info().split('.')[:2] ])
 
         db = proxy(self)
         def _get_string_literal():
             def string_literal(obj, dummy=None):
-                return db.string_literal(obj)
+                return self._db.string_literal(obj)
             return string_literal
 
         def _get_unicode_literal():
             def unicode_literal(u, dummy=None):
-                return db.literal(u.encode(unicode_literal.charset))
+                return self.literal(u.encode(unicode_literal.charset))
             return unicode_literal
 
         def _get_string_decoder():
@@ -199,26 +197,40 @@ class Connection(_mysql.connection):
         self.unicode_literal = unicode_literal = _get_unicode_literal()
         self.string_decoder = string_decoder = _get_string_decoder()
         if not charset:
-            charset = self.character_set_name()
-        self.set_character_set(charset)
+            charset = self._db.character_set_name()
+        self._db.set_character_set(charset)
 
         if sql_mode:
             self.set_sql_mode(sql_mode)
 
-        if use_unicode:
-            self.converter[FIELD_TYPE.STRING].append((None, string_decoder))
-            self.converter[FIELD_TYPE.VAR_STRING].append((None, string_decoder))
-            self.converter[FIELD_TYPE.VARCHAR].append((None, string_decoder))
-            self.converter[FIELD_TYPE.BLOB].append((None, string_decoder))
+        #if use_unicode:
+            #self._db.converter[FIELD_TYPE.STRING].append((None, string_decoder))
+            #self._db.converter[FIELD_TYPE.VAR_STRING].append((None, string_decoder))
+            #self._db.converter[FIELD_TYPE.VARCHAR].append((None, string_decoder))
+            #self._db.converter[FIELD_TYPE.BLOB].append((None, string_decoder))
 
         self.encoders[str] = string_literal
         self.encoders[unicode] = unicode_literal
-        self._transactional = self.server_capabilities & CLIENT.TRANSACTIONS
+        string_decoder.charset = charset
+        unicode_literal.charset = charset
+        self._transactional = self._db.server_capabilities & CLIENT.TRANSACTIONS
         if self._transactional:
             # PEP-249 requires autocommit to be initially off
             self.autocommit(False)
         self.messages = []
-        
+    
+    def autocommit(self, do_autocommit):
+        return self._db.autocommit(do_autocommit)
+    
+    def commit(self):
+        return self._db.commit()
+    
+    def rollback(self):
+        return self._db.rollback()
+    
+    def close(self):
+        return self._db.close()
+    
     def cursor(self, cursorclass=None):
         """
         Create a cursor on which queries may be performed. The optional
@@ -244,19 +256,21 @@ class Connection(_mysql.connection):
 
         Non-standard. For internal use; do not use this in your applications.
         """
-        return self.escape(obj, self.encoders)
+        return self._db.escape(obj, self.encoders)
 
-    if not hasattr(_mysql.connection, 'warning_count'):
-
-        def warning_count(self):
-            """Return the number of warnings generated from the last query.
-            This is derived from the info() method."""
-            info = self.info()
+    def _warning_count(self):
+        """Return the number of warnings generated from the last query."""
+        if hasattr(self._db, "warning_count"):
+            return self._db.warning_count()
+        else:
+            info = self._db.info()
             if info:
                 return int(info.split()[-1])
             else:
                 return 0
-
+    def character_set_name(self):
+        return self._db.character_set_name()
+    
     def set_character_set(self, charset):
         """Set the connection character set to charset. The character set can
         only be changed in MySQL-4.1 and newer. If you try to change the
@@ -267,12 +281,12 @@ class Connection(_mysql.connection):
         connection using the charset parameter."""
         if self.character_set_name() != charset:
             try:
-                super(Connection, self).set_character_set(charset)
+                self._db.set_character_set(charset)
             except AttributeError:
                 if self._server_version < (4, 1):
                     raise self.NotSupportedError, "server is too old to set charset"
-                self.query('SET NAMES %s' % charset)
-                self.store_result()
+                self._db.query('SET NAMES %s' % charset)
+                self._db.store_result()
         self.string_decoder.charset = charset
         self.unicode_literal.charset = charset
 
@@ -284,10 +298,10 @@ class Connection(_mysql.connection):
         using the sql_mode parameter."""
         if self._server_version < (4, 1):
             raise self.NotSupportedError, "server is too old to set sql_mode"
-        self.query("SET SESSION sql_mode='%s'" % sql_mode)
-        self.store_result()
+        self._db.query("SET SESSION sql_mode='%s'" % sql_mode)
+        self._db.store_result()
         
-    def show_warnings(self):
+    def _show_warnings(self):
         """Return detailed information about warnings as a sequence of tuples
         of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
         If your server is an earlier version, an empty sequence is returned.
@@ -295,8 +309,8 @@ class Connection(_mysql.connection):
         Non-standard. This is invoked automatically after executing a query,
         so you should not usually call it yourself."""
         if self._server_version < (4, 1): return ()
-        self.query("SHOW WARNINGS")
-        result = self.store_result()
+        self._db.query("SHOW WARNINGS")
+        result = self._db.store_result()
         warnings = result.fetch_row(0)
         return warnings
     
