@@ -1,3 +1,6 @@
+#ifndef _MYSQL_PYTHON__MYSQL_H_
+#define #ifndef _MYSQL_PYTHON__MYSQL_H_
+
 #include "pymemcompat.h"
 
 #ifdef MS_WIN32
@@ -66,7 +69,7 @@ typedef struct {
 
 extern PyTypeObject _mysql_FieldObject_Type;
 
-int _mysql_server_init_done;
+extern int _mysql_server_init_done;
 #if MYSQL_VERSION_ID >= 40000
 #define check_server_init(x) if (!_mysql_server_init_done) { if (mysql_server_init(0, NULL, NULL)) { _mysql_Exception(NULL); return x; } else { _mysql_server_init_done = 1;} }
 #else
@@ -100,3 +103,5 @@ _mysql_FieldObject_Initialize(
 	_mysql_FieldObject *self,
 	PyObject *args,
 	PyObject *kwargs);
+	
+#endif
