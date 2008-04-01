@@ -1,14 +1,11 @@
 #ifndef _MYSQL_PYTHON__MYSQL_H_
-#define #ifndef _MYSQL_PYTHON__MYSQL_H_
+#define _MYSQL_PYTHON__MYSQL_H_
 
 #include "pymemcompat.h"
 
 #ifdef MS_WIN32
 #include <windows.h>
 #endif /* MS_WIN32 */
-#ifndef uint
-#define uint unsigned int
-#endif
 
 #include "structmember.h"
 #include "mysql.h"
