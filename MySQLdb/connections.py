@@ -132,8 +132,8 @@ class Connection(object):
         from weakref import proxy
         
         kwargs2 = kwargs.copy()
-        
-        if kwargs.has_key('conv'):
+
+        if 'conv' in kwargs:
             conv = kwargs['conv']
         else:
             conv = conversions
