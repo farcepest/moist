@@ -119,7 +119,7 @@ static int _mysql_ResultObject_clear(
 	self->conn = NULL;
 	return 0;
 }
-	
+
 static char _mysql_ResultObject_describe__doc__[] =
 "Returns the sequence of 7-tuples required by the DB-API for\n\
 the Cursor.description attribute.\n\
@@ -128,12 +128,12 @@ the Cursor.description attribute.\n\
 static PyObject *
 _mysql_ResultObject_describe(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
 	PyObject *d;
 	MYSQL_FIELD *fields;
 	unsigned int i, n;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+
 	check_result_connection(self);
 	n = mysql_num_fields(self->result);
 	fields = mysql_fetch_fields(self->result);
@@ -165,13 +165,13 @@ the Cursor.description attribute.\n\
 static PyObject *
 _mysql_ResultObject_fields(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
 	PyObject *arglist=NULL, *kwarglist=NULL;
 	PyObject *fields=NULL;
 	_mysql_FieldObject *field=NULL;
 	unsigned int i, n;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+
 	check_result_connection(self);
 	kwarglist = PyDict_New();
 	if (!kwarglist) goto error;
@@ -195,7 +195,7 @@ _mysql_ResultObject_fields(
 	Py_XDECREF(fields);
 	return NULL;
 }
-		
+
 static char _mysql_ResultObject_field_flags__doc__[] =
 "Returns a tuple of field flags, one for each column in the result.\n\
 " ;
@@ -203,12 +203,12 @@ static char _mysql_ResultObject_field_flags__doc__[] =
 static PyObject *
 _mysql_ResultObject_field_flags(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
 	PyObject *d;
 	MYSQL_FIELD *fields;
 	unsigned int i, n;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+
 	check_result_connection(self);
 	n = mysql_num_fields(self->result);
 	fields = mysql_fetch_fields(self->result);
@@ -467,12 +467,11 @@ static char _mysql_ResultObject_num_fields__doc__[] =
 static PyObject *
 _mysql_ResultObject_num_fields(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
-	if (!PyArg_ParseTuple(args, "")) return NULL;
 	check_result_connection(self);
 	return PyInt_FromLong((long)mysql_num_fields(self->result));
-}	
+}
 
 static char _mysql_ResultObject_num_rows__doc__[] =
 "Returns the number of rows in the result set. Note that if\n\
@@ -483,12 +482,11 @@ set has been read.\n\
 static PyObject *
 _mysql_ResultObject_num_rows(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
-	if (!PyArg_ParseTuple(args, "")) return NULL;
 	check_result_connection(self);
 	return PyLong_FromUnsignedLongLong(mysql_num_rows(self->result));
-}	
+}
 
 
 static char _mysql_ResultObject_data_seek__doc__[] =
@@ -533,10 +531,10 @@ static char _mysql_ResultObject_row_tell__doc__[] =
 static PyObject *
 _mysql_ResultObject_row_tell(
 	_mysql_ResultObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
 	MYSQL_ROW_OFFSET r;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+
 	check_result_connection(self);
 	if (self->use) {
 		PyErr_SetString(_mysql_ProgrammingError,
@@ -583,19 +581,19 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 	{
 		"row_tell",
 		(PyCFunction)_mysql_ResultObject_row_tell,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_row_tell__doc__
 	},
 	{
 		"describe",
 		(PyCFunction)_mysql_ResultObject_describe,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_describe__doc__
 	},
 	{
 		"fields",
 		(PyCFunction)_mysql_ResultObject_fields,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_fields__doc__
 	},
 	{
@@ -607,19 +605,19 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 	{
 		"field_flags",
 		(PyCFunction)_mysql_ResultObject_field_flags,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_field_flags__doc__
 	},
 	{
 		"num_fields",
 		(PyCFunction)_mysql_ResultObject_num_fields,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_num_fields__doc__
 	},
 	{
 		"num_rows",
 		(PyCFunction)_mysql_ResultObject_num_rows,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_ResultObject_num_rows__doc__
 	},
 	{NULL,              NULL} /* sentinel */
