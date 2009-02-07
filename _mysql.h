@@ -1,7 +1,7 @@
 #ifndef _MYSQL_PYTHON__MYSQL_H_
 #define _MYSQL_PYTHON__MYSQL_H_
 
-#include "pymemcompat.h"
+#include <Python.h>
 
 #ifdef MS_WIN32
 #include <windows.h>
@@ -13,19 +13,11 @@
 #include "mysqld_error.h"
 #include "errmsg.h"
 
-#if PY_VERSION_HEX < 0x02020000
-# define MyTuple_Resize(t,n,d) _PyTuple_Resize(t, n, d)
-# define MyMember(a,b,c,d,e) {a,b,c,d}
-# define MyMemberlist(x) struct memberlist x
-# define MyAlloc(s,t) PyObject_New(s,&t)
-# define MyFree(o) PyObject_Del(o)
-#else
-# define MyTuple_Resize(t,n,d) _PyTuple_Resize(t, n)
-# define MyMember(a,b,c,d,e) {a,b,c,d,e}
-# define MyMemberlist(x) struct PyMemberDef x
-# define MyAlloc(s,t) (s *) t.tp_alloc(&t,0)
-# define MyFree(ob) ob->ob_type->tp_free((PyObject *)ob) 
-#endif
+#define MyTuple_Resize(t,n,d) _PyTuple_Resize(t, n)
+#define MyMember(a,b,c,d,e) {a,b,c,d,e}
+#define MyMemberlist(x) struct PyMemberDef x
+#define MyAlloc(s,t) (s *) t.tp_alloc(&t,0)
+#define MyFree(ob) ob->ob_type->tp_free((PyObject *)ob)
 
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
@@ -77,11 +69,11 @@ extern PyObject *_mysql_MySQLError;
 extern PyObject *_mysql_Warning;
 extern PyObject *_mysql_Error;
 extern PyObject *_mysql_DatabaseError;
-extern PyObject *_mysql_InterfaceError; 
+extern PyObject *_mysql_InterfaceError;
 extern PyObject *_mysql_DataError;
-extern PyObject *_mysql_OperationalError; 
-extern PyObject *_mysql_IntegrityError; 
-extern PyObject *_mysql_InternalError; 
+extern PyObject *_mysql_OperationalError;
+extern PyObject *_mysql_IntegrityError;
+extern PyObject *_mysql_InternalError;
 extern PyObject *_mysql_ProgrammingError;
 extern PyObject *_mysql_NotSupportedError;
 extern PyObject *_mysql_error_map;
@@ -100,5 +92,5 @@ _mysql_FieldObject_Initialize(
 	_mysql_FieldObject *self,
 	PyObject *args,
 	PyObject *kwargs);
-	
+
 #endif

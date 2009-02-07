@@ -4,7 +4,6 @@ include MANIFEST
 include ChangeLog
 include HISTORY
 include GPL
-include pymemcompat.h
 recursive-include tests *.py
 include metadata.cfg
 include site.cfg
