@@ -70,7 +70,7 @@ static PyObject *_mysql_server_init(
 	PyObject *kwargs) {
 	static char *kwlist[] = {"args", "groups", NULL};
 	char **cmd_args_c=NULL, **groups_c=NULL, *s;
-	int cmd_argc=0, i, groupc;
+	Py_ssize_t cmd_argc=0, i, groupc;
 	PyObject *cmd_args=NULL, *groups=NULL, *ret=NULL, *item;
 
 	if (_mysql_server_init_done) {
@@ -78,7 +78,7 @@ static PyObject *_mysql_server_init(
 				"already initialized");
 		return NULL;
 	}
-	  
+
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist,
 					 &cmd_args, &groups))
 		return NULL;
