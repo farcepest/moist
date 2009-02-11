@@ -30,36 +30,19 @@ from MySQLdb.constants import FIELD_TYPE
 from MySQLdb.times import Date, Time, Timestamp, \
     DateFromTicks, TimeFromTicks, TimestampFromTicks
 
-from sets import ImmutableSet
+try:
+    frozenset
+except NameError:
+    from sets import ImmutableSet as frozenset
 
-class DBAPISet(ImmutableSet):
-
+class DBAPISet(frozenset):
     """A special type of set for which A == x is True if A is a
     DBAPISet and x is a member of that set.
-    
-      >>> from MySQLdb.constants import FIELD_TYPE
-      >>> FIELD_TYPE.VAR_STRING == STRING
-      True
-      >>> FIELD_TYPE.DATE == NUMBER
-      False
-      >>> FIELD_TYPE.DATE != DATE
-      False
-      
     """
-
-    def __ne__(self, other):
-        from sets import BaseSet
-        if isinstance(other, BaseSet):
-            return super(DBAPISet, self).__ne__(self, other)
-        else:
-            return other not in self
-
     def __eq__(self, other):
-        from sets import BaseSet
-        if isinstance(other, BaseSet):
-            return super(DBAPISet, self).__eq__(self, other)
-        else:
-            return other in self
+        if isinstance(other, DBAPISet):
+            return not self.difference(other)
+        return other in self
 
 
 STRING    = DBAPISet([FIELD_TYPE.ENUM, FIELD_TYPE.STRING,
@@ -74,6 +57,18 @@ TIME      = DBAPISet([FIELD_TYPE.TIME])
 TIMESTAMP = DBAPISet([FIELD_TYPE.TIMESTAMP, FIELD_TYPE.DATETIME])
 DATETIME  = TIMESTAMP
 ROWID     = DBAPISet()
+
+def test_DBAPISet_set_equality():
+    assert STRING == STRING
+
+def test_DBAPISet_set_inequality():
+    assert STRING != NUMBER
+
+def test_DBAPISet_set_equality_membership():
+    assert FIELD_TYPE.VAR_STRING == STRING
+
+def test_DBAPISet_set_inequality_membership():
+    assert FIELD_TYPE.DATE != STRING
 
 def Binary(x):
     """Return x as a binary type."""
@@ -97,9 +92,3 @@ __all__ = [
     'escape_dict', 'escape_sequence', 'escape_string', 'get_client_info',
     'paramstyle', 'string_literal', 'threadsafety', 'version_info',
     ]
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
-    
