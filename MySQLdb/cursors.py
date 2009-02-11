@@ -11,10 +11,12 @@ __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
 
 import re
-INSERT_VALUES = re.compile(
-    r"^(P<start>.+\svalues\s*)(P<values>\(((?<!\\)'.*?\).*(?<!\\)?'|.)+?\))(P<end>.*)$",
-    re.IGNORECASE)
 
+INSERT_VALUES = re.compile(r"\svalues\s*"
+                           r"(\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'"
+                           r"|[^\(\)]|"
+                           r"(?:\([^\)]*\))"
+                           r")+\))")
 
 class BaseCursor(object):
     
