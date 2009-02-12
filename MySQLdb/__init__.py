@@ -58,18 +58,6 @@ TIMESTAMP = DBAPISet([FIELD_TYPE.TIMESTAMP, FIELD_TYPE.DATETIME])
 DATETIME  = TIMESTAMP
 ROWID     = DBAPISet()
 
-def test_DBAPISet_set_equality():
-    assert STRING == STRING
-
-def test_DBAPISet_set_inequality():
-    assert STRING != NUMBER
-
-def test_DBAPISet_set_equality_membership():
-    assert FIELD_TYPE.VAR_STRING == STRING
-
-def test_DBAPISet_set_inequality_membership():
-    assert FIELD_TYPE.DATE != STRING
-
 def Binary(x):
     """Return x as a binary type."""
     return str(x)

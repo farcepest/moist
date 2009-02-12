@@ -1,6 +1,21 @@
 import unittest
 
 import MySQLdb
+from MySQLdb.constants import FIELD_TYPE
+
+
+class TestDBAPISet(unittest.TestCase):
+    def test_set_equality(self):
+        self.assertTrue(MySQLdb.STRING == MySQLdb.STRING)
+
+    def test_set_inequality(self):
+        self.assertTrue(MySQLdb.STRING != MySQLdb.NUMBER)
+
+    def test_set_equality_membership(self):
+        self.assertTrue(FIELD_TYPE.VAR_STRING == MySQLdb.STRING)
+
+    def test_set_inequality_membership(self):
+        self.assertTrue(FIELD_TYPE.DATE != MySQLdb.STRING)
 
 
 class NonStandard(unittest.TestCase):
