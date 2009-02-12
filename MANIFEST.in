@@ -9,4 +9,3 @@ include metadata.cfg
 include site.cfg
 include setup_*.py
 include ez_setup.py
-
