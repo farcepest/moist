@@ -36,13 +36,17 @@ MySQL.connect().
 
 from _mysql import string_literal, escape_sequence, escape_dict, NULL
 from MySQLdb.constants import FIELD_TYPE, FLAG
-from sets import Set
 from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
      timedelta_or_None, datetime_or_None, date_or_None, \
      mysql_timestamp_converter
 from types import InstanceType
 import array
 import datetime
+
+try:
+    set
+except NameError:
+    from sets import Set as set
 
 __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
@@ -52,13 +56,13 @@ def bool_to_sql(boolean, conv):
     return str(int(boolean))
 
 def SET_to_Set(value):
-    """Convert MySQL SET column to Python Set."""
-    return Set([ i for i in value.split(',') if i ])
+    """Convert MySQL SET column to Python set."""
+    return set([ i for i in value.split(',') if i ])
 
-def Set_to_sql(set, conv):
-    """Convert a Python Set to an SQL literal."""
-    return string_literal(','.join(set), conv)
-    
+def Set_to_sql(value, conv):
+    """Convert a Python xet to an SQL literal."""
+    return string_literal(','.join(value), conv)
+
 def object_to_sql(obj, conv):
     """Convert something into a string via str()."""
     return str(obj)
@@ -122,9 +126,9 @@ conversions = {
     bool: bool_to_sql,
     datetime.datetime: datetime_to_sql,
     datetime.timedelta: timedelta_to_sql,
-    Set: Set_to_sql,
+    set: Set_to_sql,
     str: object_to_quoted_sql, # default
-    
+
     FIELD_TYPE.TINY: int,
     FIELD_TYPE.SHORT: int,
     FIELD_TYPE.LONG: long,

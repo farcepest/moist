@@ -29,7 +29,7 @@ def defaulterrorhandler(connection, cursor, errorclass, errorvalue):
         connection.messages.append(error)
     del cursor
     del connection
-    raise errorclass, errorvalue
+    raise errorclass(errorvalue)
 
 
 class Connection(object):
@@ -284,7 +284,7 @@ class Connection(object):
                 self._db.set_character_set(charset)
             except AttributeError:
                 if self._server_version < (4, 1):
-                    raise self.NotSupportedError, "server is too old to set charset"
+                    raise self.NotSupportedError("server is too old to set charset")
                 self._db.query('SET NAMES %s' % charset)
                 self._db.store_result()
         self.string_decoder.charset = charset
@@ -297,7 +297,7 @@ class Connection(object):
         Non-standard. It is better to set this when creating the connection
         using the sql_mode parameter."""
         if self._server_version < (4, 1):
-            raise self.NotSupportedError, "server is too old to set sql_mode"
+            raise self.NotSupportedError("server is too old to set sql_mode")
         self._db.query("SET SESSION sql_mode='%s'" % sql_mode)
         self._db.store_result()
         
