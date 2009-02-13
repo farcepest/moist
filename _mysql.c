@@ -1,14 +1,16 @@
+/* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
+
 #include "_mysql.h"
 
 PyObject *_mysql_MySQLError;
  PyObject *_mysql_Warning;
  PyObject *_mysql_Error;
   PyObject *_mysql_DatabaseError;
-  PyObject *_mysql_InterfaceError; 
+  PyObject *_mysql_InterfaceError;
   PyObject *_mysql_DataError;
-  PyObject *_mysql_OperationalError; 
-  PyObject *_mysql_IntegrityError; 
-  PyObject *_mysql_InternalError; 
+  PyObject *_mysql_OperationalError;
+  PyObject *_mysql_IntegrityError;
+  PyObject *_mysql_InternalError;
   PyObject *_mysql_ProgrammingError;
   PyObject *_mysql_NotSupportedError;
 PyObject *_mysql_error_map;
@@ -55,7 +57,7 @@ _mysql_Exception(_mysql_ConnectionObject *c)
 	Py_DECREF(t);
 	return NULL;
 }
-	  
+
 static char _mysql_server_init__doc__[] =
 "Initialize embedded server. If this client is not linked against\n\
 the embedded server library, this function does nothing.\n\
@@ -168,7 +170,7 @@ static PyObject *_mysql_server_end(
 	}
 	return _mysql_Exception(NULL);
 }
-	 
+
 #if MYSQL_VERSION_ID >= 32314
 static char _mysql_thread_safe__doc__[] =
 "Indicates whether the client is compiled as thread-safe.";
@@ -264,7 +266,7 @@ _mysql_escape_sequence(
 	PyObject *self,
 	PyObject *args)
 {
-	PyObject *o=NULL, *d=NULL, *r=NULL, *item, *quoted; 
+	PyObject *o=NULL, *d=NULL, *r=NULL, *item, *quoted;
 	int i, n;
 	if (!PyArg_ParseTuple(args, "OO:escape_sequence", &o, &d))
 		goto error;
@@ -298,7 +300,7 @@ _mysql_escape_dict(
 	PyObject *self,
 	PyObject *args)
 {
-	PyObject *o=NULL, *d=NULL, *r=NULL, *item, *quoted, *pkey; 
+	PyObject *o=NULL, *d=NULL, *r=NULL, *item, *quoted, *pkey;
 	Py_ssize_t ppos = 0;
 	if (!PyArg_ParseTuple(args, "O!O:escape_dict", &PyDict_Type, &o, &d))
 		goto error;
@@ -338,21 +340,21 @@ extern PyTypeObject _mysql_ResultObject_Type;
 
 static PyMethodDef
 _mysql_methods[] = {
-	{ 
+	{
 		"connect",
 		(PyCFunction)_mysql_connect,
 		METH_VARARGS | METH_KEYWORDS,
 		_mysql_connect__doc__
 	},
-	{ 
+	{
 		"debug",
-		(PyCFunction)_mysql_debug, 
+		(PyCFunction)_mysql_debug,
 		METH_VARARGS,
 		_mysql_debug__doc__
 	},
 	{
-		"escape", 
-		(PyCFunction)_mysql_escape, 
+		"escape",
+		(PyCFunction)_mysql_escape,
 		METH_VARARGS,
 		_mysql_escape__doc__
 	},
@@ -368,13 +370,13 @@ _mysql_methods[] = {
 		METH_VARARGS,
 		_mysql_escape_dict__doc__
 	},
-	{ 
+	{
 		"escape_string",
 		(PyCFunction)_mysql_escape_string,
 		METH_VARARGS,
 		_mysql_escape_string__doc__
 	},
-	{ 
+	{
 		"string_literal",
 		(PyCFunction)_mysql_string_literal,
 		METH_VARARGS,
@@ -444,23 +446,23 @@ DL_EXPORT(void)
 init_mysql(void)
 {
 	PyObject *dict, *module, *emod, *edict;
-	module = Py_InitModule4("_mysql", _mysql_methods, _mysql___doc__,
-				(PyObject *)NULL, PYTHON_API_VERSION);
-	if (!module) return; /* this really should never happen */
+
+	module = Py_InitModule3("_mysql", _mysql_methods, _mysql___doc__);
+	if (!module)
+		return; /* this really should never happen */
+
 	_mysql_ConnectionObject_Type.ob_type = &PyType_Type;
 	_mysql_ResultObject_Type.ob_type = &PyType_Type;
 	_mysql_FieldObject_Type.ob_type = &PyType_Type;
-#if PY_VERSION_HEX >= 0x02020000
 	_mysql_ConnectionObject_Type.tp_alloc = PyType_GenericAlloc;
 	_mysql_ConnectionObject_Type.tp_new = PyType_GenericNew;
-	_mysql_ConnectionObject_Type.tp_free = _PyObject_GC_Del; 
+	_mysql_ConnectionObject_Type.tp_free = _PyObject_GC_Del;
 	_mysql_ResultObject_Type.tp_alloc = PyType_GenericAlloc;
 	_mysql_ResultObject_Type.tp_new = PyType_GenericNew;
 	_mysql_ResultObject_Type.tp_free = _PyObject_GC_Del;
 	_mysql_FieldObject_Type.tp_alloc = PyType_GenericAlloc;
 	_mysql_FieldObject_Type.tp_new = PyType_GenericNew;
 	_mysql_FieldObject_Type.tp_free = _PyObject_GC_Del;
-#endif
 
 	if (!(dict = PyModule_GetDict(module))) goto error;
 	if (PyDict_SetItemString(dict, "version_info",
@@ -476,11 +478,11 @@ init_mysql(void)
 	Py_INCREF(&_mysql_ConnectionObject_Type);
 	if (PyDict_SetItemString(dict, "result",
 			       (PyObject *)&_mysql_ResultObject_Type))
-		goto error;	
+		goto error;
 	Py_INCREF(&_mysql_ResultObject_Type);
 	if (PyDict_SetItemString(dict, "field",
 			       (PyObject *)&_mysql_FieldObject_Type))
-		goto error;	
+		goto error;
 	Py_INCREF(&_mysql_FieldObject_Type);
 	if (!(emod = PyImport_ImportModule("MySQLdb.exceptions")))
 		goto error;
