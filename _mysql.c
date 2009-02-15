@@ -442,15 +442,16 @@ an argument are now methods of the result object. Deprecated functions\n\
 (as of 3.23) are NOT implemented.\n\
 ";
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 init_mysql(void)
 {
-	PyObject *dict, *module, *emod, *edict;
+	PyObject *dict, *module, *emod, *edict, *version_tuple;
 
 	module = Py_InitModule3("_mysql", _mysql_methods, _mysql___doc__);
 	if (!module)
 		return; /* this really should never happen */
 
+	/* Populate final object settings */
 	_mysql_ConnectionObject_Type.ob_type = &PyType_Type;
 	_mysql_ResultObject_Type.ob_type = &PyType_Type;
 	_mysql_FieldObject_Type.ob_type = &PyType_Type;
@@ -464,14 +465,22 @@ init_mysql(void)
 	_mysql_FieldObject_Type.tp_new = PyType_GenericNew;
 	_mysql_FieldObject_Type.tp_free = _PyObject_GC_Del;
 
-	if (!(dict = PyModule_GetDict(module))) goto error;
-	if (PyDict_SetItemString(dict, "version_info",
-			       PyRun_String(QUOTE(version_info), Py_eval_input,
-				       dict, dict)))
+	if (!(dict = PyModule_GetDict(module)))
 		goto error;
-	if (PyDict_SetItemString(dict, "__version__",
-			       PyString_FromString(QUOTE(__version__))))
+
+	/* Module constants */
+	version_tuple = PyRun_String(QUOTE(version_info), Py_eval_input,
+				     dict, dict);
+	if (PyModule_AddObject(module, "version_info", version_tuple) < 0)
 		goto error;
+	if (PyModule_AddStringConstant(module, "__version__",
+				       QUOTE(__version__)) < 0)
+		goto error;
+	if (PyModule_AddStringConstant(module, "NULL", "NULL") < 0)
+		goto error;
+
+
+	/* Register types */
 	if (PyDict_SetItemString(dict, "connection",
 			       (PyObject *)&_mysql_ConnectionObject_Type))
 		goto error;
@@ -484,6 +493,8 @@ init_mysql(void)
 			       (PyObject *)&_mysql_FieldObject_Type))
 		goto error;
 	Py_INCREF(&_mysql_FieldObject_Type);
+
+	/* Reach into the exceptions module. */
 	if (!(emod = PyImport_ImportModule("MySQLdb.exceptions")))
 		goto error;
 	if (!(edict = PyModule_GetDict(emod))) goto error;
@@ -523,9 +534,7 @@ init_mysql(void)
 	if (!(_mysql_error_map = PyDict_GetItemString(edict, "error_map")))
 		goto error;
 	Py_DECREF(emod);
-	if (!(_mysql_NULL = PyString_FromString("NULL")))
-		goto error;
-	if (PyDict_SetItemString(dict, "NULL", _mysql_NULL)) goto error;
+
   error:
 	if (PyErr_Occurred())
 		PyErr_SetString(PyExc_ImportError,
