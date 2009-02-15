@@ -159,7 +159,7 @@ does nothing.";
 
 static PyObject *_mysql_server_end(
 	PyObject *self,
-	PyObject *args) {
+	PyObject *unused) {
 	if (_mysql_server_init_done) {
 #if MYSQL_VERSION_ID >= 40000
 		mysql_server_end();
@@ -177,12 +177,10 @@ static char _mysql_thread_safe__doc__[] =
 
 static PyObject *_mysql_thread_safe(
 	PyObject *self,
-	PyObject *args) {
-	PyObject *flag;
-	if (!PyArg_ParseTuple(args, "")) return NULL;
+	PyObject *unused) {
+
 	check_server_init(NULL);
-	if (!(flag=PyInt_FromLong((long)mysql_thread_safe()))) return NULL;
-	return flag;
+	return PyInt_FromLong((long)mysql_thread_safe());
 }
 #endif
 
@@ -328,9 +326,8 @@ the client library version.";
 static PyObject *
 _mysql_get_client_info(
 	PyObject *self,
-	PyObject *args)
+	PyObject *unused)
 {
-	if (!PyArg_ParseTuple(args, "")) return NULL;
 	check_server_init(NULL);
 	return PyString_FromString(mysql_get_client_info());
 }
@@ -385,14 +382,14 @@ _mysql_methods[] = {
 	{
 		"get_client_info",
 		(PyCFunction)_mysql_get_client_info,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_get_client_info__doc__
 	},
 #if MYSQL_VERSION_ID >= 32314
 	{
 		"thread_safe",
 		(PyCFunction)_mysql_thread_safe,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_thread_safe__doc__
 	},
 #endif
@@ -405,7 +402,7 @@ _mysql_methods[] = {
 	{
 		"server_end",
 		(PyCFunction)_mysql_server_end,
-		METH_VARARGS,
+		METH_NOARGS,
 		_mysql_server_end__doc__
 	},
 	{NULL, NULL} /* sentinel */

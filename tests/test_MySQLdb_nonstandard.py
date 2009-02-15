@@ -19,14 +19,8 @@ class TestDBAPISet(unittest.TestCase):
         self.assertTrue(FIELD_TYPE.DATE != MySQLdb.STRING)
 
 
-class CoreAPI(unittest.TestCase):
-    """Test _mysql internals."""
-
-    def setUp(self):
-        self.conn = _mysql.connect(db='test')
-
-    def tearDown(self):
-        self.conn.close()
+class CoreModule(unittest.TestCase):
+    """Core _mysql module features."""
 
     def test_NULL(self):
         """Should have a NULL constant."""
@@ -38,6 +32,22 @@ class CoreAPI(unittest.TestCase):
 
         self.assertTrue(isinstance(_mysql.version_info, tuple))
         self.assertEqual(len(_mysql.version_info), 5)
+
+    def test_client_info(self):
+        self.assertTrue(isinstance(_mysql.get_client_info(), str))
+
+    def test_thread_safe(self):
+        self.assertTrue(isinstance(_mysql.thread_safe(), int))
+
+
+class CoreAPI(unittest.TestCase):
+    """Test _mysql interaction internals."""
+
+    def setUp(self):
+        self.conn = _mysql.connect(db='test')
+
+    def tearDown(self):
+        self.conn.close()
 
     def test_thread_id(self):
         tid = self.conn.thread_id()
