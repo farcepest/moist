@@ -13,7 +13,6 @@
 #include "mysqld_error.h"
 #include "errmsg.h"
 
-#define MyTuple_Resize(t,n,d) _PyTuple_Resize(t, n)
 #define MyAlloc(s,t) (s *) t.tp_alloc(&t,0)
 #define MyFree(ob) ob->ob_type->tp_free((PyObject *)ob)
 

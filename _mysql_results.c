@@ -381,7 +381,7 @@ _mysql__fetch_row(
 			goto error;
 		}
 		if (!row) {
-			if (MyTuple_Resize(r, i, 0) == -1) goto error;
+			if (_PyTuple_Resize(r, i) == -1) goto error;
 			break;
 		}
 		v = convert_row(self, row);
@@ -431,7 +431,7 @@ _mysql_ResultObject_fetch_row(
 	convert_row = row_converters[how];
 	if (maxrows) {
 		if (!(r = PyTuple_New(maxrows))) goto error;
-		rowsadded = _mysql__fetch_row(self, &r, skiprows, maxrows, 
+		rowsadded = _mysql__fetch_row(self, &r, skiprows, maxrows,
 				convert_row);
 		if (rowsadded == -1) goto error;
 	} else {
@@ -444,7 +444,7 @@ _mysql_ResultObject_fetch_row(
 				if (rowsadded == -1) goto error;
 				skiprows += rowsadded;
 				if (rowsadded < maxrows) break;
-				if (MyTuple_Resize(&r, skiprows+maxrows, 0) == -1)
+				if (_PyTuple_Resize(&r, skiprows + maxrows) == -1)
 				        goto error;
 			}
 		} else {
