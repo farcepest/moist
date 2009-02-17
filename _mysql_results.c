@@ -18,9 +18,9 @@ _mysql_ResultObject_Initialize(
 	PyObject *kwargs)
 {
 	static char *kwlist[] = {"connection", "use", "converter", NULL};
-	MYSQL_RES *result; 
+	MYSQL_RES *result;
 	_mysql_ConnectionObject *conn=NULL;
-	int use=0; 
+	int use=0;
 	PyObject *conv=NULL;
 	int n, i;
 	MYSQL_FIELD *fields;
@@ -96,8 +96,8 @@ _mysql_ResultObject_Initialize(
 	return 0;
 }
 
-#if PY_VERSION_HEX >= 0x02020000
-static int _mysql_ResultObject_traverse(
+static int
+_mysql_ResultObject_traverse(
 	_mysql_ResultObject *self,
 	visitproc visit,
 	void *arg)
@@ -110,9 +110,9 @@ static int _mysql_ResultObject_traverse(
 		return visit(self->conn, arg);
 	return 0;
 }
-#endif
 
-static int _mysql_ResultObject_clear(
+static int
+_mysql_ResultObject_clear(
 	_mysql_ResultObject *self)
 {
 	Py_XDECREF(self->converter);
@@ -692,54 +692,39 @@ PyTypeObject _mysql_ResultObject_Type = {
 	(setattrfunc)_mysql_ResultObject_setattr, /* tp_setattr */
 	0, /*tp_compare*/
 	(reprfunc)_mysql_ResultObject_repr, /* tp_repr */
-	
+
 	/* Method suites for standard classes */
-	
+
 	0, /* (PyNumberMethods *) tp_as_number */
 	0, /* (PySequenceMethods *) tp_as_sequence */
 	0, /* (PyMappingMethods *) tp_as_mapping */
-	
+
 	/* More standard operations (here for binary compatibility) */
-	
+
 	0, /* (hashfunc) tp_hash */
 	0, /* (ternaryfunc) tp_call */
 	0, /* (reprfunc) tp_str */
 	0, /* (getattrofunc) tp_getattro */
 	0, /* (setattrofunc) tp_setattro */
-	
+
 	/* Functions to access object as input/output buffer */
 	0, /* (PyBufferProcs *) tp_as_buffer */
-	
+
 	/* Flags to define presence of optional/expanded features */
-#if PY_VERSION_HEX < 0x02020000
-	Py_TPFLAGS_DEFAULT, /* (long) tp_flags */
-#else
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE,
-#endif
-	
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE, /* (long) tp_flags */
+
 	_mysql_ResultObject__doc__, /* (char *) tp_doc Documentation string */
-#if PY_VERSION_HEX >= 0x02000000	
-	/* Assigned meaning in release 2.0 */
-#if PY_VERSION_HEX >= 0x02020000
 	/* call function for all accessible objects */
-	(traverseproc) _mysql_ResultObject_traverse, /* tp_traverse */
-	
+	(traverseproc)_mysql_ResultObject_traverse, /* tp_traverse */
 	/* delete references to contained objects */
-	(inquiry) _mysql_ResultObject_clear, /* tp_clear */
-#else
-	/* not supporting pre-2.2 GC */
-	0,
-	0,
-#endif
-#if PY_VERSION_HEX >= 0x02010000	
-	/* Assigned meaning in release 2.1 */
+	(inquiry)_mysql_ResultObject_clear, /* tp_clear */
+
 	/* rich comparisons */
 	0, /* (richcmpfunc) tp_richcompare */
-	
+
 	/* weak reference enabler */
 	0, /* (long) tp_weaklistoffset */
-#if PY_VERSION_HEX >= 0x02020000
-	/* Added in release 2.2 */
+
 	/* Iterators */
 	0, /* (getiterfunc) tp_iter */
 	0, /* (iternextfunc) tp_iternext */
@@ -760,7 +745,4 @@ PyTypeObject _mysql_ResultObject_Type = {
 	0, /* (PyObject *) tp_bases */
 	0, /* (PyObject *) tp_mro method resolution order */
 	0, /* (PyObject *) tp_defined */
-#endif /* python 2.2 */
-#endif /* python 2.1 */
-#endif /* python 2.0 */
 };
