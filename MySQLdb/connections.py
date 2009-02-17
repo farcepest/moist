@@ -130,7 +130,7 @@ class Connection(object):
         from MySQLdb.cursors import Cursor
         import _mysql
         from weakref import proxy
-        
+
         kwargs2 = kwargs.copy()
 
         if 'conv' in kwargs:
@@ -145,7 +145,8 @@ class Connection(object):
                     conv2[k] = v[:]
                 else:
                     conv2[k] = v
-        #kwargs2['conv'] = conv2
+        # TODO Remove this when we can do conversions in non-C space.
+        kwargs2['conv'] = conv2
 
         self.cursorclass = kwargs2.pop('cursorclass', Cursor)
         charset = kwargs2.pop('charset', '')
