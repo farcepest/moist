@@ -1,3 +1,5 @@
+/* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
+
 #include "_mysql.h"
 
 static char _mysql_ResultObject__doc__[] =
@@ -623,14 +625,14 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 	{NULL,              NULL} /* sentinel */
 };
 
-static MyMemberlist(_mysql_ResultObject_memberlist)[] = {
-	MyMember(
+static struct PyMemberDef _mysql_ResultObject_memberlist[] = {
+	{
 		"converter",
 		T_OBJECT,
-		offsetof(_mysql_ResultObject,converter),
+		offsetof(_mysql_ResultObject, converter),
 		RO,
 		"Type conversion mapping"
-		),
+	},
 	{NULL} /* Sentinel */
 };
 
@@ -640,24 +642,20 @@ _mysql_ResultObject_getattr(
 	char *name)
 {
 	PyObject *res;
+	struct PyMemberDef *l;
 
 	res = Py_FindMethod(_mysql_ResultObject_methods, (PyObject *)self, name);
 	if (res != NULL)
 		return res;
 	PyErr_Clear();
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Get((char *)self, _mysql_ResultObject_memberlist, name);
-#else
-	{
-		MyMemberlist(*l);
-		for (l = _mysql_ResultObject_memberlist; l->name != NULL; l++) {
-			if (strcmp(l->name, name) == 0)
-				return PyMember_GetOne((char *)self, l);
-		}
-		PyErr_SetString(PyExc_AttributeError, name);
-		return NULL;
+
+	for (l = _mysql_ResultObject_memberlist; l->name != NULL; l++) {
+		if (strcmp(l->name, name) == 0)
+			return PyMember_GetOne((char *)self, l);
 	}
-#endif
+
+	PyErr_SetString(PyExc_AttributeError, name);
+	return NULL;
 }
 
 static int
@@ -666,23 +664,20 @@ _mysql_ResultObject_setattr(
 	char *name,
 	PyObject *v)
 {
+	struct PyMemberDef *l;
+
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError,
 				"can't delete connection attributes");
 		return -1;
 	}
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Set((char *)self, _mysql_ResultObject_memberlist, name, v);
-#else
-        {
-		MyMemberlist(*l);
-		for (l = _mysql_ResultObject_memberlist; l->name != NULL; l++)
-			if (strcmp(l->name, name) == 0)
-				return PyMember_SetOne((char *)self, l, v);
-	}
+
+	for (l = _mysql_ResultObject_memberlist; l->name != NULL; l++)
+		if (strcmp(l->name, name) == 0)
+			return PyMember_SetOne((char *)self, l, v);
+
         PyErr_SetString(PyExc_AttributeError, name);
         return -1;
-#endif
 }
 
 PyTypeObject _mysql_ResultObject_Type = {
@@ -748,10 +743,10 @@ PyTypeObject _mysql_ResultObject_Type = {
 	/* Iterators */
 	0, /* (getiterfunc) tp_iter */
 	0, /* (iternextfunc) tp_iternext */
-	
+
 	/* Attribute descriptor and subclassing stuff */
-	(struct PyMethodDef *) _mysql_ResultObject_methods, /* tp_methods */
-	(MyMemberlist(*)) _mysql_ResultObject_memberlist, /*tp_members */
+	(struct PyMethodDef *)_mysql_ResultObject_methods, /* tp_methods */
+	(struct PyMemberDef *)_mysql_ResultObject_memberlist, /*tp_members */
 	0, /* (struct getsetlist *) tp_getset; */
 	0, /* (struct _typeobject *) tp_base; */
 	0, /* (PyObject *) tp_dict */

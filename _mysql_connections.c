@@ -1318,42 +1318,42 @@ static PyMethodDef _mysql_ConnectionObject_methods[] = {
 	{NULL,              NULL} /* sentinel */
 };
 
-static MyMemberlist(_mysql_ConnectionObject_memberlist)[] = {
-	MyMember(
+static struct PyMemberDef _mysql_ConnectionObject_memberlist[] = {
+	{
 		"open",
 		T_INT,
-		offsetof(_mysql_ConnectionObject,open),
+		offsetof(_mysql_ConnectionObject, open),
 		RO,
 		"True if connection is open"
-		),
-	MyMember(
+	},
+	{
 		"converter",
 		T_OBJECT,
-		offsetof(_mysql_ConnectionObject,converter),
+		offsetof(_mysql_ConnectionObject, converter),
 		0,
 		"Type conversion mapping"
-		),
-	MyMember(
+	},
+	{
 		"server_capabilities",
 		T_UINT,
-		offsetof(_mysql_ConnectionObject,connection.server_capabilities),
+		offsetof(_mysql_ConnectionObject, connection.server_capabilities),
 		RO,
 		"Capabilites of server; consult MySQLdb.constants.CLIENT"
-		),
-	MyMember(
+	},
+	{
 		 "port",
 		 T_UINT,
-		 offsetof(_mysql_ConnectionObject,connection.port),
+		 offsetof(_mysql_ConnectionObject, connection.port),
 		 RO,
 		 "TCP/IP port of the server connection"
-		 ),
-	MyMember(
+	},
+	{
 		 "client_flag",
 		 T_UINT,
 		 RO,
-		 offsetof(_mysql_ConnectionObject,connection.client_flag),
+		 offsetof(_mysql_ConnectionObject, connection.client_flag),
 		 "Client flags; refer to MySQLdb.constants.CLIENT"
-		 ),
+	},
 	{NULL} /* Sentinel */
 };
 
@@ -1363,6 +1363,7 @@ _mysql_ConnectionObject_getattr(
 	char *name)
 {
 	PyObject *res;
+	struct PyMemberDef *l;
 
 	res = Py_FindMethod(_mysql_ConnectionObject_methods, (PyObject *)self, name);
 	if (res != NULL)
@@ -1370,19 +1371,14 @@ _mysql_ConnectionObject_getattr(
 	PyErr_Clear();
 	if (strcmp(name, "closed") == 0)
 		return PyInt_FromLong((long)!(self->open));
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Get((char *)self, _mysql_ConnectionObject_memberlist, name);
-#else
-	{
-		MyMemberlist(*l);
-		for (l = _mysql_ConnectionObject_memberlist; l->name != NULL; l++) {
-			if (strcmp(l->name, name) == 0)
-				return PyMember_GetOne((char *)self, l);
-		}
-		PyErr_SetString(PyExc_AttributeError, name);
-		return NULL;
+
+	for (l = _mysql_ConnectionObject_memberlist; l->name != NULL; l++) {
+		if (strcmp(l->name, name) == 0)
+			return PyMember_GetOne((char *)self, l);
 	}
-#endif
+
+	PyErr_SetString(PyExc_AttributeError, name);
+	return NULL;
 }
 
 static int
@@ -1391,23 +1387,20 @@ _mysql_ConnectionObject_setattr(
 	char *name,
 	PyObject *v)
 {
+	struct PyMemberDef *l;
+
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError,
 				"can't delete connection attributes");
 		return -1;
 	}
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Set((char *)self, _mysql_ConnectionObject_memberlist, name, v);
-#else
-        {
-		MyMemberlist(*l);
-		for (l = _mysql_ConnectionObject_memberlist; l->name != NULL; l++)
-			if (strcmp(l->name, name) == 0)
-				return PyMember_SetOne((char *)self, l, v);
-	}
+
+	for (l = _mysql_ConnectionObject_memberlist; l->name != NULL; l++)
+		if (strcmp(l->name, name) == 0)
+			return PyMember_SetOne((char *)self, l, v);
+
         PyErr_SetString(PyExc_AttributeError, name);
         return -1;
-#endif
 }
 
 PyTypeObject _mysql_ConnectionObject_Type = {
@@ -1463,7 +1456,7 @@ PyTypeObject _mysql_ConnectionObject_Type = {
 
 	/* Attribute descriptor and subclassing stuff */
 	(struct PyMethodDef *)_mysql_ConnectionObject_methods, /* tp_methods */
-	(MyMemberlist(*))_mysql_ConnectionObject_memberlist, /* tp_members */
+	(struct PyMemberDef *)_mysql_ConnectionObject_memberlist, /* tp_members */
 	0, /* (struct getsetlist *) tp_getset; */
 	0, /* (struct _typeobject *) tp_base; */
 	0, /* (PyObject *) tp_dict */

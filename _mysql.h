@@ -14,8 +14,6 @@
 #include "errmsg.h"
 
 #define MyTuple_Resize(t,n,d) _PyTuple_Resize(t, n)
-#define MyMember(a,b,c,d,e) {a,b,c,d,e}
-#define MyMemberlist(x) struct PyMemberDef x
 #define MyAlloc(s,t) (s *) t.tp_alloc(&t,0)
 #define MyFree(ob) ob->ob_type->tp_free((PyObject *)ob)
 
