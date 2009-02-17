@@ -1,3 +1,5 @@
+/* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
+
 #include "_mysql.h"
 
 static char _mysql_FieldObject__doc__[] =
@@ -68,113 +70,113 @@ static PyMethodDef _mysql_FieldObject_methods[] = {
 	{NULL,              NULL} /* sentinel */
 };
 
-static MyMemberlist(_mysql_FieldObject_memberlist)[] = {
-	MyMember(
+static struct PyMemberDef _mysql_FieldObject_memberlist[] = {
+	{
 		"result",
 		T_OBJECT,
-		offsetof(_mysql_FieldObject,result),
+		offsetof(_mysql_FieldObject, result),
 		RO,
 		"Result set"
-		),
-	MyMember(
+	},
+	{
 		"name",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.name),
+		offsetof(_mysql_FieldObject, field.name),
 		RO,
 		"The name of the field. If the field was given\n\
 an alias with an AS clause, the value of name is the alias."
-		),
-	MyMember(
+	},
+	{
 		"org_name",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.org_name),
+		offsetof(_mysql_FieldObject, field.org_name),
 		RO,
 		"The name of the field. Aliases are ignored."
-		),
-	MyMember(
+	},
+	{
 		"table",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.table),
+		offsetof(_mysql_FieldObject, field.table),
 		RO,
 		"The name of the table containing this field,\n\
 if it isn't a calculated field. For calculated fields,\n\
 the table value is an empty string. If the column is selected from a view,\n\
 table names the view. If the table or view was given an alias with an AS clause,\n\
 the value of table is the alias.\n"
-		),
-	MyMember(
+	},
+	{
 		"org_table",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.org_table),
+		offsetof(_mysql_FieldObject, field.org_table),
 		RO,
 		"The name of the table. Aliases are ignored.\n\
 If the column is selected from a view, org_table names the underlying table.\n"
-		),
-	MyMember(
+	},
+	{
 		"db",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.db),
+		offsetof(_mysql_FieldObject, field.db),
 		RO,
 		"The name of the database that the field comes from.\n\
 If the field is a calculated field, db is an empty string."
-		),
-	MyMember(
+	},
+	{
 		"catalog",
 		T_STRING,
-		offsetof(_mysql_FieldObject,field.catalog),
+		offsetof(_mysql_FieldObject, field.catalog),
 		RO,
 		"The catalog name. This value is always \"def\"."
-		),
-	MyMember(
+	},
+	{
 		"length",
 		T_ULONG,
-		offsetof(_mysql_FieldObject,field.length),
+		offsetof(_mysql_FieldObject, field.length),
 		RO,
 		"The width of the field.\n\
 as specified in the table definition.\n"
-		),
-	MyMember(
+	},
+	{
 		"max_length",
 		T_ULONG,
-		offsetof(_mysql_FieldObject,field.max_length),
+		offsetof(_mysql_FieldObject, field.max_length),
 		RO,
 		"The maximum width of the field for the result set\n\
 (the length of the longest field value for the rows actually in the\n\
 result set). If you use conn.store_result(), this contains the\n\
 maximum length for the field. If you use conn.use_result(),\n\
 the value of this variable is zero.\n"
-		),
-	MyMember(
+	},
+	{
 		"decimals",
 		T_UINT,
-		offsetof(_mysql_FieldObject,field.decimals),
+		offsetof(_mysql_FieldObject, field.decimals),
 		RO,
 		"The number of decimals for numeric fields.\n"
-		),
-	MyMember(
+	},
+	{
 		"charsetnr",
 		T_UINT,
-		offsetof(_mysql_FieldObject,field.charsetnr),
+		offsetof(_mysql_FieldObject, field.charsetnr),
 		RO,
 		"The character set number for the field."
-		),
-	MyMember(
+	},
+	{
 		"flags",
 		T_UINT,
-		offsetof(_mysql_FieldObject,field.flags),
+		offsetof(_mysql_FieldObject, field.flags),
 		RO,
 		"Different bit-flags for the field.\n\
 The bits are enumerated in MySQLdb.constants.FLAG.\n\
 The flags value may have zero or more of these bits set.\n"
-		),
-	MyMember(
+	},
+	{
 		"type",
 		T_UINT,
-		offsetof(_mysql_FieldObject,field.type),
+		offsetof(_mysql_FieldObject, field.type),
 		RO,
 		"The type of the field. The type values\n\
 are enumerated in MySQLdb.constants.FIELD_TYPE.\n"
-		),
+	},
 	{NULL} /* Sentinel */
 };
 
@@ -184,24 +186,20 @@ _mysql_FieldObject_getattr(
 	char *name)
 {
 	PyObject *res;
+	struct PyMemberDef *l;
 
 	res = Py_FindMethod(_mysql_FieldObject_methods, (PyObject *)self, name);
 	if (res != NULL)
 		return res;
 	PyErr_Clear();
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Get((char *)self, _mysql_FieldObject_memberlist, name);
-#else
-	{
-		MyMemberlist(*l);
-		for (l = _mysql_FieldObject_memberlist; l->name != NULL; l++) {
-			if (strcmp(l->name, name) == 0)
-				return PyMember_GetOne((char *)self, l);
-		}
-		PyErr_SetString(PyExc_AttributeError, name);
-		return NULL;
+
+	for (l = _mysql_FieldObject_memberlist; l->name != NULL; l++) {
+		if (strcmp(l->name, name) == 0)
+			return PyMember_GetOne((char *)self, l);
 	}
-#endif
+
+	PyErr_SetString(PyExc_AttributeError, name);
+	return NULL;
 }
 
 static int
@@ -210,23 +208,21 @@ _mysql_FieldObject_setattr(
 	char *name,
 	PyObject *v)
 {
+	struct PyMemberDef *l;
+
 	if (v == NULL) {
 		PyErr_SetString(PyExc_AttributeError,
 				"can't delete attributes");
 		return -1;
 	}
-#if PY_VERSION_HEX < 0x02020000
-	return PyMember_Set((char *)self, _mysql_FieldObject_memberlist, name, v);
-#else
-        {
-		MyMemberlist(*l);
-		for (l = _mysql_FieldObject_memberlist; l->name != NULL; l++)
-			if (strcmp(l->name, name) == 0)
-				return PyMember_SetOne((char *)self, l, v);
-	}
+
+
+	for (l = _mysql_FieldObject_memberlist; l->name != NULL; l++)
+		if (strcmp(l->name, name) == 0)
+			return PyMember_SetOne((char *)self, l, v);
+
         PyErr_SetString(PyExc_AttributeError, name);
         return -1;
-#endif
 }
 
 PyTypeObject _mysql_FieldObject_Type = {
@@ -292,10 +288,10 @@ PyTypeObject _mysql_FieldObject_Type = {
 	/* Iterators */
 	0, /* (getiterfunc) tp_iter */
 	0, /* (iternextfunc) tp_iternext */
-	
+
 	/* Attribute descriptor and subclassing stuff */
-	(struct PyMethodDef *) _mysql_FieldObject_methods, /* tp_methods */
-	(MyMemberlist(*)) _mysql_FieldObject_memberlist, /*tp_members */
+	(struct PyMethodDef *)_mysql_FieldObject_methods, /* tp_methods */
+	(struct PyMemberDef *)_mysql_FieldObject_memberlist, /*tp_members */
 	0, /* (struct getsetlist *) tp_getset; */
 	0, /* (struct _typeobject *) tp_base; */
 	0, /* (PyObject *) tp_dict */
