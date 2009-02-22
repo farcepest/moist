@@ -14,8 +14,8 @@ class DatabaseTest(unittest.TestCase):
 
     db_module = None
     connect_args = ()
-    connect_kwargs = dict()
-    create_table_extra = ''
+    connect_kwargs = dict(use_unicode=True, charset="utf8")
+    create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8"
     rows = 10
     debug = False
     
@@ -25,7 +25,7 @@ class DatabaseTest(unittest.TestCase):
         self.connection = db
         self.cursor = db.cursor()
         self.BLOBText = ''.join([chr(i) for i in range(256)] * 100);
-        self.BLOBUText = u''.join([unichr(i) for i in range(16384)])
+        self.BLOBUText = u''.join([unichr(i) for i in range(16834)])
         self.BLOBBinary = self.db_module.Binary(''.join([chr(i) for i in range(256)] * 16))
 
     leak_test = True
@@ -257,14 +257,17 @@ class DatabaseTest(unittest.TestCase):
             else:
                 return self.BLOBUText # 'BLOB Text ' * 1024
         self.check_data_integrity(
-                 ('col1 INT','col2 LONG'),
+                 ('col1 INT', 'col2 LONG'),
                  generator)
 
     def test_TEXT(self):
         def generator(row,col):
-            return self.BLOBUText # 'BLOB Text ' * 1024
+            if col == 0:
+                return row
+            else:
+                return self.BLOBUText # 'BLOB Text ' * 1024
         self.check_data_integrity(
-                 ('col2 TEXT',),
+                 ('col1 INT', 'col2 TEXT'),
                  generator)
 
     def test_LONG_BYTE(self):
