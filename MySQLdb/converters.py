@@ -61,7 +61,7 @@ def SET_to_Set(value):
     return set([ i for i in value.split(',') if i ])
 
 def Set_to_sql(value, conv):
-    """Convert a Python xet to an SQL literal."""
+    """Convert a Python set to an SQL literal."""
     return string_literal(','.join(value), conv)
 
 def object_to_sql(obj, conv):
