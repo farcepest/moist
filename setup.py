@@ -24,4 +24,5 @@ metadata['ext_modules'] = [
         **options),
     ]
 metadata['long_description'] = metadata['long_description'].replace(r'\n', '')
+metadata['test_suite'] = 'nose.collector'
 setup(**metadata)
