@@ -42,6 +42,7 @@ from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
 from types import InstanceType
 import array
 import datetime
+from decimal import Decimal
 
 try:
     set
@@ -134,8 +135,8 @@ conversions = {
     FIELD_TYPE.LONG: int,
     FIELD_TYPE.FLOAT: float,
     FIELD_TYPE.DOUBLE: float,
-    FIELD_TYPE.DECIMAL: float,
-    FIELD_TYPE.NEWDECIMAL: float,
+    FIELD_TYPE.DECIMAL: Decimal,
+    FIELD_TYPE.NEWDECIMAL: Decimal,
     FIELD_TYPE.LONGLONG: int,
     FIELD_TYPE.INT24: int,
     FIELD_TYPE.YEAR: int,
@@ -158,12 +159,6 @@ conversions = {
         ],
     }
 
-try:
-    from decimal import Decimal
-    conversions[FIELD_TYPE.DECIMAL] = Decimal
-    conversions[FIELD_TYPE.NEWDECIMAL] = Decimal
-except ImportError:
-    pass
 
 
 
