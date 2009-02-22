@@ -44,11 +44,6 @@ import array
 import datetime
 from decimal import Decimal
 
-try:
-    set
-except NameError:
-    from sets import Set as set
-
 __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
 

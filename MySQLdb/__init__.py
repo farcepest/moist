@@ -30,10 +30,6 @@ from MySQLdb.constants import FIELD_TYPE
 from MySQLdb.times import Date, Time, Timestamp, \
     DateFromTicks, TimeFromTicks, TimestampFromTicks
 
-try:
-    frozenset
-except NameError:
-    from sets import ImmutableSet as frozenset
 
 class DBAPISet(frozenset):
     """A special type of set for which A == x is True if A is a
