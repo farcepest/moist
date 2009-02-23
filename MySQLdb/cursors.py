@@ -11,6 +11,8 @@ __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
 
 import re
+import sys
+import weakref
 
 INSERT_VALUES = re.compile(r"\svalues\s*"
                            r"(\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'"
@@ -40,14 +42,12 @@ class BaseCursor(object):
     from MySQLdb.exceptions import MySQLError, Warning, Error, InterfaceError, \
          DatabaseError, DataError, OperationalError, IntegrityError, \
          InternalError, ProgrammingError, NotSupportedError
-    
+
     _defer_warnings = False
     _fetch_type = None
-    
+
     def __init__(self, connection):
-        from weakref import proxy
-    
-        self.connection = proxy(connection)
+        self.connection = weakref.proxy(connection)
         self.description = None
         self.description_flags = None
         self.rowcount = -1
@@ -60,12 +60,12 @@ class BaseCursor(object):
         self._warnings = 0
         self._info = None
         self.rownumber = None
-        
+
     def __del__(self):
         self.close()
         self.errorhandler = None
         self._result = None
-        
+
     def close(self):
         """Close the cursor. No further queries will be possible."""
         if not self.connection:
@@ -162,7 +162,6 @@ class BaseCursor(object):
         Returns long integer rows affected, if any
 
         """
-        from sys import exc_info
         del self.messages[:]
         db = self._get_db()
         charset = db.character_set_name()
@@ -181,7 +180,7 @@ class BaseCursor(object):
                 self.messages.append((TypeError, msg))
                 self.errorhandler(self, TypeError, msg)
         except:
-            exc, value, traceback = exc_info()
+            exc, value, traceback = sys.exc_info()
             del traceback
             self.messages.append((exc, value))
             self.errorhandler(self, exc, value)
@@ -236,8 +235,7 @@ class BaseCursor(object):
                 self.messages.append((TypeError, msg))
                 self.errorhandler(self, TypeError, msg)
         except:
-            from sys import exc_info
-            exc, value, traceback = exc_info()
+            exc, value, traceback = sys.exc_info()
             del traceback
             self.errorhandler(self, exc, value)
         self.rowcount = int(self._query(
