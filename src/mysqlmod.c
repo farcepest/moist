@@ -1,6 +1,6 @@
 /* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
 
-#include "_mysql.h"
+#include "mysqlmod.h"
 
 PyObject *_mysql_MySQLError;
  PyObject *_mysql_Warning;

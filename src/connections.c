@@ -1,6 +1,6 @@
 /* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
 
-#include "_mysql.h"
+#include "mysqlmod.h"
 
 static int
 _mysql_ConnectionObject_Initialize(

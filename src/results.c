@@ -1,6 +1,6 @@
 /* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
 
-#include "_mysql.h"
+#include "mysqlmod.h"
 
 static char _mysql_ResultObject__doc__[] =
 "result(connection, use=0, converter={}) -- Result set from a query.\n\

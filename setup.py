@@ -14,14 +14,12 @@ else: # assume windows
 
 metadata, options = get_config()
 metadata['ext_modules'] = [
-    Extension(
-        sources = [
-            '_mysql.c',
-            '_mysql_connections.c',
-            '_mysql_results.c',
-            '_mysql_fields.c',
-            ],
-        **options),
+    Extension(sources=['src/mysqlmod.c',
+                       'src/connections.c',
+                       'src/results.c',
+                       'src/fields.c',
+                       ],
+              **options),
     ]
 metadata['long_description'] = metadata['long_description'].replace(r'\n', '')
 metadata['test_suite'] = 'nose.collector'
