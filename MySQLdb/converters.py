@@ -125,6 +125,13 @@ conversions = {
     set: Set_to_sql,
     str: object_to_quoted_sql, # default
 
+    }
+
+# This is for MySQL column types that can be converted directly
+# into Python types without having to look at metadata (flags,
+# character sets, etc.). This should always be used as the last
+# resort.
+simple_sql_to_python_conversions = {
     FIELD_TYPE.TINY: int,
     FIELD_TYPE.SHORT: int,
     FIELD_TYPE.LONG: int,
@@ -139,20 +146,61 @@ conversions = {
     FIELD_TYPE.TIMESTAMP: mysql_timestamp_converter,
     FIELD_TYPE.DATETIME: datetime_or_None,
     FIELD_TYPE.TIME: timedelta_or_None,
-    FIELD_TYPE.DATE: date_or_None,
-    FIELD_TYPE.BLOB: [
-        (FLAG.BINARY, str),
-        ],
-    FIELD_TYPE.STRING: [
-        (FLAG.BINARY, str),
-        ],
-    FIELD_TYPE.VAR_STRING: [
-        (FLAG.BINARY, str),
-        ],
-    FIELD_TYPE.VARCHAR: [
-        (FLAG.BINARY, str),
-        ],
+    FIELD_TYPE.DATE: date_or_None,   
     }
+
+# Converter plugin protocol
+# Each plugin is passed a cursor object and a field object.
+# The plugin returns a single value:
+# A callable that given an SQL value, returns a Python object.
+# This can be as simple as int or str, etc. If the plugin
+# returns None, this plugin will be ignored and the next plugin
+# on the stack will be checked.
+
+def filter_NULL(f):
+    def _filter_NULL(o):
+        if o is None: return o
+        return f(o)
+    _filter_NULL.__name__ = f.__name__
+    return _filter_NULL
+
+def sql_to_python_last_resort_plugin(cursor, field):
+    return str
+
+def simple_sql_to_python_plugin(cursor, field):
+    return simple_sql_to_python_conversions.get(field.type, None)
+
+character_types = [
+    FIELD_TYPE.BLOB, 
+    FIELD_TYPE.STRING,
+    FIELD_TYPE.VAR_STRING,
+    FIELD_TYPE.VARCHAR,
+    ]
+
+def character_sql_to_python_plugin(cursor, field):
+    if field.type not in character_types:
+        return None
+    if field.flags & FLAG.BINARY:
+        return str
+    
+    charset = cursor.connection.character_set_name()
+    def char_to_unicode(s):
+        return s.decode(charset)
+    
+    return char_to_unicode
+
+sql_to_python_plugins = [
+    character_sql_to_python_plugin,
+    simple_sql_to_python_plugin,
+    sql_to_python_last_resort_plugin,
+    ]
+
+def lookup_converter(cursor, field):
+    for plugin in sql_to_python_plugins:
+        f = plugin(cursor, field)
+        if f:
+            return filter_NULL(f)
+    return None # this should never happen
 
 
 

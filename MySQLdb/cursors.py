@@ -125,8 +125,16 @@ class BaseCursor(object):
     
     def _do_get_result(self):
         """Get the result from the last query."""
+        from MySQLdb.converters import lookup_converter
         connection = self._get_db()
         self._result = self._get_result()
+        if self._result:
+            self.sql_to_python = [ 
+                lookup_converter(self, f)
+                for f in self._result.fields()
+            ]
+        else:
+            self.sql_to_python = []
         self.rowcount = connection.affected_rows()
         self.rownumber = 0
         self.description = self._result and self._result.describe() or None
@@ -184,6 +192,7 @@ class BaseCursor(object):
             del traceback
             self.messages.append((exc, value))
             self.errorhandler(self, exc, value)
+            
         self._executed = query
         if not self._defer_warnings:
             self._warning_check()
@@ -313,7 +322,14 @@ class BaseCursor(object):
         """Low-level fetch_row wrapper."""
         if not self._result:
             return ()
-        return self._result.fetch_row(size, self._fetch_type)
+        # unfortunately it is necessary to wrap these generators up as tuples
+        # as the rows are expected to be subscriptable.
+        return tuple(
+            ( 
+                tuple( ( f(x) for f, x in zip(self.sql_to_python, row) ) )
+                for row in self._result.fetch_row(size, self._fetch_type)
+            )
+        )
 
     def __iter__(self):
         return iter(self.fetchone, None)
