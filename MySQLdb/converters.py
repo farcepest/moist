@@ -180,7 +180,7 @@ character_types = [
 def character_sql_to_python_plugin(cursor, field):
     if field.type not in character_types:
         return None
-    if field.flags & FLAG.BINARY:
+    if field.charsetnr == 63:
         return str
     
     charset = cursor.connection.character_set_name()
