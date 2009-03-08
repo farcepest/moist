@@ -73,7 +73,15 @@ class test_MySQLdb(capabilities.DatabaseTest):
         self.check_data_integrity(
             ('col1 char(1)','col2 char(1)'),
             generator)
-        
+
+    def test_bug_2671682(self):
+        from MySQLdb.constants import ER
+        try:
+            self.cursor.execute("describe some_non_existent_table");
+        except self.connection.ProgrammingError, msg:
+            self.failUnless(msg[0] == ER.NO_SUCH_TABLE)
+    
+    
 if __name__ == '__main__':
     if test_MySQLdb.leak_test:
         import gc
