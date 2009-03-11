@@ -81,6 +81,9 @@ class test_MySQLdb(capabilities.DatabaseTest):
         except self.connection.ProgrammingError, msg:
             self.failUnless(msg[0] == ER.NO_SUCH_TABLE)
     
+    def test_ping(self):
+        self.connection.ping()
+
     
 if __name__ == '__main__':
     if test_MySQLdb.leak_test:
