@@ -20,7 +20,8 @@ INSERT_VALUES = re.compile(r"\svalues\s*"
                            r"(?:\([^\)]*\))"
                            r")+\))")
 
-class BaseCursor(object):
+
+class Cursor(object):
     
     """A base for Cursor classes. Useful attributes:
     
@@ -46,7 +47,8 @@ class BaseCursor(object):
     _defer_warnings = False
     _fetch_type = None
 
-    def __init__(self, connection):
+    def __init__(self, connection, decoders, encoders):
+        from MySQLdb.converters import default_decoders
         self.connection = weakref.proxy(connection)
         self.description = None
         self.description_flags = None
@@ -60,6 +62,7 @@ class BaseCursor(object):
         self._warnings = 0
         self._info = None
         self.rownumber = None
+        self._decoders = decoders
 
     def __del__(self):
         self.close()
@@ -116,21 +119,21 @@ class BaseCursor(object):
         self._warning_check()
         return True
 
-    def _post_get_result(self):
-        """Stub to be overridden by MixIn."""
-        
-    def _get_result(self):
-        """Stub to be overridden by MixIn."""
-        return []
-    
+    def _lookup_decoder(self, field):
+        from MySQLdb.converters import filter_NULL
+        for plugin in self._decoders:
+            f = plugin(self, field)
+            if f:
+                return filter_NULL(f)
+        return None # this should never happen   
+
     def _do_get_result(self):
         """Get the result from the last query."""
-        from MySQLdb.converters import lookup_converter
         connection = self._get_db()
         self._result = self._get_result()
         if self._result:
             self.sql_to_python = [ 
-                lookup_converter(self, f)
+                self._lookup_decoder(f)
                 for f in self._result.fields()
             ]
         else:
@@ -334,22 +337,6 @@ class BaseCursor(object):
     def __iter__(self):
         return iter(self.fetchone, None)
 
-    def fetchone(self):
-        """Stub to be overridden by a MixIn."""
-        return None
-    
-    def fetchall(self):
-        """Stub to be overridden by a MixIn."""
-        return []
-    
-
-class CursorStoreResultMixIn(object):
-
-    """This is a MixIn class which causes the entire result set to be
-    stored on the client side, i.e. it uses mysql_store_result(). If the
-    result set can be very large, consider adding a LIMIT clause to your
-    query, or using CursorUseResultMixIn instead."""
-
     def _get_result(self):
         """Low-level; uses mysql_store_result()"""
         return self._get_db().store_result()
@@ -418,100 +405,4 @@ class CursorStoreResultMixIn(object):
         result = self.rownumber and self._rows[self.rownumber:] or self._rows
         return iter(result)
     
-
-class CursorUseResultMixIn(object):
-
-    """This is a MixIn class which causes the result set to be stored
-    in the server and sent row-by-row to client side, i.e. it uses
-    mysql_use_result(). You MUST retrieve the entire result set and
-    close() the cursor before additional queries can be peformed on
-    the connection."""
-
-    _defer_warnings = True
-    
-    def _get_result(self):
-        """Low-level; calls mysql_use_result()"""
-        return self._get_db().use_result()
-
-    def fetchone(self):
-        """Fetches a single row from the cursor."""
-        self._check_executed()
-        rows = self._fetch_row(1)
-        if not rows:
-            self._warning_check()
-            return None
-        self.rownumber = self.rownumber + 1
-        return rows[0]
-             
-    def fetchmany(self, size=None):
-        """Fetch up to size rows from the cursor. Result set may be smaller
-        than size. If size is not defined, cursor.arraysize is used."""
-        self._check_executed()
-        rows = self._fetch_row(size or self.arraysize)
-        self.rownumber = self.rownumber + len(rows)
-        if not rows:
-            self._warning_check()
-        return rows
-         
-    def fetchall(self):
-        """Fetchs all available rows from the cursor."""
-        self._check_executed()
-        rows = self._fetch_row(0)
-        self.rownumber = self.rownumber + len(rows)
-        self._warning_check()
-        return rows
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        row = self.fetchone()
-        if row is None:
-            raise StopIteration
-        return row
-    
-
-class CursorTupleRowsMixIn(object):
-
-    """This is a MixIn class that causes all rows to be returned as tuples,
-    which is the standard form required by DB API."""
-
     _fetch_type = 0
-
-
-class CursorDictRowsMixIn(object):
-
-    """This is a MixIn class that causes all rows to be returned as
-    dictionaries. This is a non-standard feature."""
-
-    _fetch_type = 1
-
-
-class Cursor(CursorStoreResultMixIn, CursorTupleRowsMixIn,
-             BaseCursor):
-
-    """This is the standard Cursor class that returns rows as tuples
-    and stores the result set in the client."""
-
-
-class DictCursor(CursorStoreResultMixIn, CursorDictRowsMixIn,
-                 BaseCursor):
-
-    """This is a Cursor class that returns rows as dictionaries and
-    stores the result set in the client."""
-   
-
-class SSCursor(CursorUseResultMixIn, CursorTupleRowsMixIn,
-               BaseCursor):
-
-    """This is a Cursor class that returns rows as tuples and stores
-    the result set in the server."""
-
-
-class SSDictCursor(CursorUseResultMixIn, CursorDictRowsMixIn,
-                   BaseCursor):
-
-    """This is a Cursor class that returns rows as dictionaries and
-    stores the result set in the server."""
-
-

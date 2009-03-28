@@ -107,7 +107,7 @@ def char_array(obj):
 def array_to_sql(obj, conv):
     return object_to_quoted_sql(obj.tostring(), conv)
 
-conversions = {
+simple_type_encoders = {
     int: object_to_sql,
     long: object_to_sql,
     float: float_to_sql,
@@ -124,14 +124,13 @@ conversions = {
     datetime.timedelta: timedelta_to_sql,
     set: Set_to_sql,
     str: object_to_quoted_sql, # default
-
     }
 
 # This is for MySQL column types that can be converted directly
 # into Python types without having to look at metadata (flags,
 # character sets, etc.). This should always be used as the last
 # resort.
-simple_sql_to_python_conversions = {
+simple_field_decoders = {
     FIELD_TYPE.TINY: int,
     FIELD_TYPE.SHORT: int,
     FIELD_TYPE.LONG: int,
@@ -149,12 +148,12 @@ simple_sql_to_python_conversions = {
     FIELD_TYPE.DATE: date_or_None,   
     }
 
-# Converter plugin protocol
-# Each plugin is passed a cursor object and a field object.
-# The plugin returns a single value:
-# A callable that given an SQL value, returns a Python object.
-# This can be as simple as int or str, etc. If the plugin
-# returns None, this plugin will be ignored and the next plugin
+# Decoder protocol
+# Each decoder is passed a cursor object and a field object.
+# The decoder returns a single value:
+# * A callable that given an SQL value, returns a Python object.
+# This can be as simple as int or str, etc. If the decoder
+# returns None, this decoder will be ignored and the next decoder
 # on the stack will be checked.
 
 def filter_NULL(f):
@@ -164,11 +163,11 @@ def filter_NULL(f):
     _filter_NULL.__name__ = f.__name__
     return _filter_NULL
 
-def sql_to_python_last_resort_plugin(cursor, field):
+def default_decoder(cursor, field):
     return str
 
-def simple_sql_to_python_plugin(cursor, field):
-    return simple_sql_to_python_conversions.get(field.type, None)
+def simple_decoder(cursor, field):
+    return simple_field_decoders.get(field.type, None)
 
 character_types = [
     FIELD_TYPE.BLOB, 
@@ -177,10 +176,10 @@ character_types = [
     FIELD_TYPE.VARCHAR,
     ]
 
-def character_sql_to_python_plugin(cursor, field):
+def character_decoder(cursor, field):
     if field.type not in character_types:
         return None
-    if field.charsetnr == 63:
+    if field.charsetnr == 63: # BINARY
         return str
     
     charset = cursor.connection.character_set_name()
@@ -189,18 +188,16 @@ def character_sql_to_python_plugin(cursor, field):
     
     return char_to_unicode
 
-sql_to_python_plugins = [
-    character_sql_to_python_plugin,
-    simple_sql_to_python_plugin,
-    sql_to_python_last_resort_plugin,
+default_decoders = [
+    character_decoder,
+    simple_decoder,
+    default_decoder,
     ]
 
-def lookup_converter(cursor, field):
-    for plugin in sql_to_python_plugins:
-        f = plugin(cursor, field)
-        if f:
-            return filter_NULL(f)
-    return None # this should never happen
+default_encoders = [
+    ]
+
+
 
 
 

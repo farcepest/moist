@@ -66,9 +66,12 @@ class Connection(object):
         unix_socket
           string, location of unix_socket to use
 
-        conv
-          conversion dictionary, see MySQLdb.converters
-
+        decoders
+          list, SQL decoder stack
+          
+        encoders
+          list, SQL encoder stack
+          
         connect_timeout
           number of seconds to wait before the connection attempt
           fails.
@@ -87,9 +90,6 @@ class Connection(object):
 
         read_default_group
           configuration group to use from the default file
-
-        cursorclass
-          class object, used to create cursors (keyword only)
 
         use_unicode
           If True, text-like columns are returned as unicode objects
@@ -126,39 +126,20 @@ class Connection(object):
 
         """
         from MySQLdb.constants import CLIENT, FIELD_TYPE
-        from MySQLdb.converters import conversions
+        from MySQLdb.converters import default_decoders, default_encoders
+        from MySQLdb.converters import simple_type_encoders as conversions
         from MySQLdb.cursors import Cursor
         import _mysql
-        from weakref import proxy
 
         kwargs2 = kwargs.copy()
 
-        if 'conv' in kwargs:
-            conv = kwargs['conv']
-        else:
-            conv = conversions
-
-        conv2 = {}
-        for k, v in conv.items():
-            if isinstance(k, int):
-                if isinstance(v, list):
-                    conv2[k] = v[:]
-                else:
-                    conv2[k] = v
-        # TODO Remove this when we can do conversions in non-C space.
-        kwargs2['conv'] = conv2
-
-        self.cursorclass = kwargs2.pop('cursorclass', Cursor)
+        self.cursorclass = Cursor
         charset = kwargs2.pop('charset', '')
-
-        if charset:
-            use_unicode = True
-        else:
-            use_unicode = False
-            
-        use_unicode = kwargs2.pop('use_unicode', use_unicode)
-        sql_mode = kwargs2.pop('sql_mode', '')
-
+        if 'decoders' not in kwargs2:
+            kwargs2['decoders'] = default_decoders;
+        self.decoders = kwargs2.pop('decoders', default_decoders) # XXX kwargs2['decoders']
+        self.encoders = conversions # XXX kwargs2.pop('encoders', default_encoders)
+        
         client_flag = kwargs.get('client_flag', 0)
         client_version = tuple(
             [ int(n) for n in _mysql.get_client_info().split('.')[:2] ])
@@ -166,55 +147,23 @@ class Connection(object):
             client_flag |= CLIENT.MULTI_STATEMENTS
         if client_version >= (5, 0):
             client_flag |= CLIENT.MULTI_RESULTS
-            
+        
         kwargs2['client_flag'] = client_flag
-
+        
+        sql_mode = kwargs2.pop('sql_mode', None)
+        
         self._db = _mysql.connection(*args, **kwargs2)
 
-        self.encoders = dict(
-            [ (k, v) for k, v in conv.items()
-              if type(k) is not int ])
-        
         self._server_version = tuple(
             [ int(n) for n in self._db.get_server_info().split('.')[:2] ])
 
-        db = proxy(self)
-        def _get_string_literal():
-            def string_literal(obj, dummy=None):
-                return self._db.string_literal(obj)
-            return string_literal
-
-        def _get_unicode_literal():
-            def unicode_literal(u, dummy=None):
-                return self.literal(u.encode(unicode_literal.charset))
-            return unicode_literal
-
-        def _get_string_decoder():
-            def string_decoder(s):
-                return s.decode(string_decoder.charset)
-            return string_decoder
-        
-        string_literal = _get_string_literal()
-        self.unicode_literal = unicode_literal = _get_unicode_literal()
-        self.string_decoder = string_decoder = _get_string_decoder()
-        if not charset:
-            charset = self._db.character_set_name()
-        self._db.set_character_set(charset)
+        if charset:
+            self._db.set_character_set(charset)
 
         if sql_mode:
             self.set_sql_mode(sql_mode)
 
-        #if use_unicode:
-            #self._db.converter[FIELD_TYPE.STRING].append((None, string_decoder))
-            #self._db.converter[FIELD_TYPE.VAR_STRING].append((None, string_decoder))
-            #self._db.converter[FIELD_TYPE.VARCHAR].append((None, string_decoder))
-            #self._db.converter[FIELD_TYPE.BLOB].append((None, string_decoder))
-
-        self.encoders[str] = string_literal
-        self.encoders[unicode] = unicode_literal
-        string_decoder.charset = charset
-        unicode_literal.charset = charset
-        self._transactional = self._db.server_capabilities & CLIENT.TRANSACTIONS
+        self._transactional = bool(self._db.server_capabilities & CLIENT.TRANSACTIONS)
         if self._transactional:
             # PEP-249 requires autocommit to be initially off
             self.autocommit(False)
@@ -222,6 +171,9 @@ class Connection(object):
     
     def autocommit(self, do_autocommit):
         return self._db.autocommit(do_autocommit)
+
+    def ping(self, reconnect=False):
+        return self._db.ping(reconnect)
     
     def commit(self):
         return self._db.commit()
@@ -232,13 +184,18 @@ class Connection(object):
     def close(self):
         return self._db.close()
     
-    def cursor(self, cursorclass=None):
+    def cursor(self, decoders=None, encoders=None):
         """
         Create a cursor on which queries may be performed. The optional
         cursorclass parameter is used to create the Cursor. By default,
         self.cursorclass=cursors.Cursor is used.
         """
-        return (cursorclass or self.cursorclass)(self)
+        if not decoders:
+            decoders = self.decoders[:]
+        if not encoders:
+            encoders = self.encoders.copy() #[:]
+        
+        return self.cursorclass(self, decoders, encoders)
 
     def __enter__(self):
         return self.cursor()
@@ -269,6 +226,7 @@ class Connection(object):
                 return int(info.split()[-1])
             else:
                 return 0
+
     def character_set_name(self):
         return self._db.character_set_name()
     
