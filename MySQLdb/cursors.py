@@ -14,11 +14,9 @@ import re
 import sys
 import weakref
 
-INSERT_VALUES = re.compile(r"\svalues\s*"
-                           r"(\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'"
-                           r"|[^\(\)]|"
-                           r"(?:\([^\)]*\))"
-                           r")+\))")
+INSERT_VALUES = re.compile(r"(?P<start>.+values\s*)"
+                           r"(?P<values>\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'|[^\(\)]|(?:\([^\)]*\)))+\))"
+                           r"(?P<end>.*)", re.I)
 
 
 class Cursor(object):

@@ -81,6 +81,18 @@ class test_MySQLdb(capabilities.DatabaseTest):
         except self.connection.ProgrammingError, msg:
             self.failUnless(msg[0] == ER.NO_SUCH_TABLE)
     
+    def test_INSERT_VALUES(self):
+        from MySQLdb.cursors import INSERT_VALUES
+        query = """INSERT FOO (a, b, c) VALUES (%s, %s, %s)"""
+        matched = INSERT_VALUES.match(query)
+        self.failUnless(matched)
+        start = matched.group('start')
+        end = matched.group('end')
+        values = matched.group('values')
+        self.failUnless(start == """INSERT FOO (a, b, c) VALUES """)
+        self.failUnless(values == "(%s, %s, %s)")
+        self.failUnless(end == "")
+        
     def test_ping(self):
         self.connection.ping()
 
