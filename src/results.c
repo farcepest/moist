@@ -629,6 +629,13 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 
 static struct PyMemberDef _mysql_ResultObject_memberlist[] = {
 	{
+		"connection",
+		T_OBJECT,
+		offsetof(_mysql_ConnectionObject, connection),
+		RO,
+		"Connection associated with result"
+	},
+	{
 		"converter",
 		T_OBJECT,
 		offsetof(_mysql_ResultObject, converter),

@@ -163,10 +163,10 @@ def filter_NULL(f):
     _filter_NULL.__name__ = f.__name__
     return _filter_NULL
 
-def default_decoder(cursor, field):
+def default_decoder(field):
     return str
 
-def simple_decoder(cursor, field):
+def simple_decoder(field):
     return simple_field_decoders.get(field.type, None)
 
 character_types = [
@@ -176,13 +176,13 @@ character_types = [
     FIELD_TYPE.VARCHAR,
     ]
 
-def character_decoder(cursor, field):
+def character_decoder(field):
     if field.type not in character_types:
         return None
     if field.charsetnr == 63: # BINARY
         return str
     
-    charset = cursor.connection.character_set_name()
+    charset = field.result.connection.character_set_name()
     def char_to_unicode(s):
         return s.decode(charset)
     

@@ -120,7 +120,7 @@ class Cursor(object):
     def _lookup_decoder(self, field):
         from MySQLdb.converters import filter_NULL
         for plugin in self._decoders:
-            f = plugin(self, field)
+            f = plugin(field)
             if f:
                 return filter_NULL(f)
         return None # this should never happen   
@@ -315,10 +315,6 @@ class Cursor(object):
         self._do_get_result()
         return self.rowcount
 
-    def _query(self, query):
-        """Hook for _do_query."""
-        return self._do_query(query)
-    
     def _fetch_row(self, size=1):
         """Low-level fetch_row wrapper."""
         if not self._result:
