@@ -9,7 +9,7 @@ _mysql_ConnectionObject_Initialize(
 	PyObject *kwargs)
 {
 	MYSQL *conn = NULL;
-	PyObject *conv = NULL;
+	PyObject *decoder_stack = NULL;
 	PyObject *ssl = NULL;
 #if HAVE_OPENSSL
 	char *key = NULL, *cert = NULL, *ca = NULL,
@@ -20,7 +20,7 @@ _mysql_ConnectionObject_Initialize(
 	unsigned int port = 0;
 	unsigned int client_flag = 0;
 	static char *kwlist[] = { "host", "user", "passwd", "db", "port",
-				  "unix_socket", "conv",
+				  "unix_socket", "decoder_stack",
 				  "connect_timeout", "compress",
 				  "named_pipe", "init_command",
 				  "read_default_file", "read_default_group",
@@ -33,13 +33,13 @@ _mysql_ConnectionObject_Initialize(
 	     *read_default_file=NULL,
 	     *read_default_group=NULL;
 	
-	self->converter = NULL;
+	self->decoder_stack = NULL;
 	self->open = 0;
 	check_server_init(-1);
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisOiiisssiOi:connect",
 					 kwlist,
 					 &host, &user, &passwd, &db,
-					 &port, &unix_socket, &conv,
+					 &port, &unix_socket, &decoder_stack,
 					 &connect_timeout,
 					 &compress, &named_pipe,
 					 &init_command, &read_default_file,
@@ -49,15 +49,12 @@ _mysql_ConnectionObject_Initialize(
 					 ))
 		return -1;
 
-	/* Keep the converter mapping or a blank mapping dict */
-	if (!conv)
-		conv = PyDict_New();
+	if (!decoder_stack)
+		decoder_stack = PyList_New(0);
 	else
-		Py_INCREF(conv);
-	if (!conv)
-		return -1;
-	self->converter = conv;
-
+		Py_INCREF(decoder_stack);
+	self->decoder_stack = decoder_stack;
+	
 #define _stringsuck(d,t,s) {t=PyMapping_GetItemString(s,#d);\
         if(t){d=PyString_AsString(t);Py_DECREF(t);}\
         PyErr_Clear();}
@@ -148,10 +145,6 @@ port\n\
 unix_socket\n\
   string, location of unix_socket (UNIX-ish only)\n\
 \n\
-conv\n\
-  mapping, maps MySQL FIELD_TYPE.* to Python functions which\n\
-  convert a string to the appropriate Python type\n\
-\n\
 connect_timeout\n\
   number of seconds to wait before the connection\n\
   attempt fails.\n\
@@ -201,16 +194,16 @@ static int _mysql_ConnectionObject_traverse(
 	visitproc visit,
 	void *arg)
 {
-	if (self->converter)
-		return visit(self->converter, arg);
+	if (self->decoder_stack)
+		return visit(self->decoder_stack, arg);
 	return 0;
 }
 
 static int _mysql_ConnectionObject_clear(
 	_mysql_ConnectionObject *self)
 {
-	Py_XDECREF(self->converter);
-	self->converter = NULL;
+	Py_XDECREF(self->decoder_stack);
+	self->decoder_stack = NULL;
 	return 0;
 }
 
@@ -218,44 +211,11 @@ extern PyObject *
 _escape_item(
 	PyObject *item,
 	PyObject *d);
-	
-char _mysql_escape__doc__[] =
-"escape(obj, dict) -- escape any special characters in object obj\n\
-using mapping dict to provide quoting functions for each type.\n\
-Returns a SQL literal string.";
-PyObject *
-_mysql_escape(
-	PyObject *self,
-	PyObject *args)
-{
-	PyObject *o=NULL, *d=NULL;
-	if (!PyArg_ParseTuple(args, "O|O:escape", &o, &d))
-		return NULL;
-	if (d) {
-		if (!PyMapping_Check(d)) {
-			PyErr_SetString(PyExc_TypeError,
-					"argument 2 must be a mapping");
-			return NULL;
-		}
-		return _escape_item(o, d);
-	} else {
-		if (!self) {
-			PyErr_SetString(PyExc_TypeError,
-					"argument 2 must be a mapping");
-			return NULL;
-		}
-		return _escape_item(o,
-			   ((_mysql_ConnectionObject *) self)->converter);
-	}
-}
 
 char _mysql_escape_string__doc__[] =
 "escape_string(s) -- quote any SQL-interpreted characters in string s.\n\
-\n\
-Use connection.escape_string(s), if you use it at all.\n\
-_mysql.escape_string(s) cannot handle character sets. You are\n\
-probably better off using connection.escape(o) instead, since\n\
-it will escape entire sequences as well as strings.";
+If you want quotes around your value, use string_literal(s) instead.\n\
+";
 
 PyObject *
 _mysql_escape_string(
@@ -269,57 +229,34 @@ _mysql_escape_string(
         str = PyString_FromStringAndSize((char *) NULL, size*2+1);
         if (!str) return PyErr_NoMemory();
         out = PyString_AS_STRING(str);
-#if MYSQL_VERSION_ID < 32321
-        len = mysql_escape_string(out, in, size);
-#else
-        check_server_init(NULL);
-        if (self && self->open)
-                len = mysql_real_escape_string(&(self->connection), out, in, size);
-        else
-                len = mysql_escape_string(out, in, size);
-#endif
+	len = mysql_real_escape_string(&(self->connection), out, in, size);
         if (_PyString_Resize(&str, len) < 0) return NULL;
         return (str);
 }
 
 char _mysql_string_literal__doc__[] =
-"string_literal(obj) -- converts object obj into a SQL string literal.\n\
+"string_literal(s) -- converts string s into a SQL string literal.\n\
 This means, any special SQL characters are escaped, and it is enclosed\n\
 within single quotes. In other words, it performs:\n\
 \n\
-\"'%s'\" % escape_string(str(obj))\n\
-\n\
-Use connection.string_literal(obj), if you use it at all.\n\
-_mysql.string_literal(obj) cannot handle character sets.";
+\"'%s'\" % escape_string(s)\n\
+";
 
 PyObject *
 _mysql_string_literal(
         _mysql_ConnectionObject *self,
         PyObject *args)
 {
-        PyObject *str, *s, *o, *d;
+        PyObject *str;
         char *in, *out;
         int len, size;
-        if (!PyArg_ParseTuple(args, "O|O:string_literal", &o, &d)) return NULL;
-        s = PyObject_Str(o);
-        if (!s) return NULL;
-        in = PyString_AsString(s);
-        size = PyString_GET_SIZE(s);
+        if (!PyArg_ParseTuple(args, "s#:string_literal", &in, &size)) return NULL;
         str = PyString_FromStringAndSize((char *) NULL, size*2+3);
         if (!str) return PyErr_NoMemory();
         out = PyString_AS_STRING(str);
-#if MYSQL_VERSION_ID < 32321
-        len = mysql_escape_string(out+1, in, size);
-#else
-        check_server_init(NULL);
-        if (self && self->open)
-                len = mysql_real_escape_string(&(self->connection), out+1, in, size);
-        else
-                len = mysql_escape_string(out+1, in, size);
-#endif
+        len = mysql_real_escape_string(&(self->connection), out+1, in, size);
         *out = *(out+len+1) = '\'';
         if (_PyString_Resize(&str, len+2) < 0) return NULL;
-        Py_DECREF(s);
         return (str);
 }
 
@@ -994,7 +931,7 @@ _mysql_ConnectionObject_store_result(
 	_mysql_ResultObject *r=NULL;
 
 	check_connection(self);
-	arglist = Py_BuildValue("(OiO)", self, 0, self->converter);
+	arglist = Py_BuildValue("(OiO)", self, 0, self->decoder_stack);
 	if (!arglist) goto error;
 	kwarglist = PyDict_New();
 	if (!kwarglist) goto error;
@@ -1054,7 +991,7 @@ _mysql_ConnectionObject_use_result(
 	_mysql_ResultObject *r=NULL;
 
 	check_connection(self);
-	arglist = Py_BuildValue("(OiO)", self, 1, self->converter);
+	arglist = Py_BuildValue("(OiO)", self, 1, self->decoder_stack);
 	if (!arglist) return NULL;
 	kwarglist = PyDict_New();
 	if (!kwarglist) goto error;
@@ -1197,12 +1134,6 @@ static PyMethodDef _mysql_ConnectionObject_methods[] = {
 		_mysql_ConnectionObject_dump_debug_info__doc__
 	},
 	{
-		"escape",
-		(PyCFunction)_mysql_escape,
-		METH_VARARGS,
-		_mysql_escape__doc__
-	},
-	{
 		"escape_string",
 		(PyCFunction)_mysql_escape_string,
 		METH_VARARGS,
@@ -1327,11 +1258,11 @@ static struct PyMemberDef _mysql_ConnectionObject_memberlist[] = {
 		"True if connection is open"
 	},
 	{
-		"converter",
+		"decoder_stack",
 		T_OBJECT,
-		offsetof(_mysql_ConnectionObject, converter),
+		offsetof(_mysql_ConnectionObject, decoder_stack),
 		0,
-		"Type conversion mapping"
+		"Type decoder stack"
 	},
 	{
 		"server_capabilities",

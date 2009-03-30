@@ -350,36 +350,6 @@ _mysql_methods[] = {
 		_mysql_debug__doc__
 	},
 	{
-		"escape",
-		(PyCFunction)_mysql_escape,
-		METH_VARARGS,
-		_mysql_escape__doc__
-	},
-	{
-		"escape_sequence",
-		(PyCFunction)_mysql_escape_sequence,
-		METH_VARARGS,
-		_mysql_escape_sequence__doc__
-	},
-	{
-		"escape_dict",
-		(PyCFunction)_mysql_escape_dict,
-		METH_VARARGS,
-		_mysql_escape_dict__doc__
-	},
-	{
-		"escape_string",
-		(PyCFunction)_mysql_escape_string,
-		METH_VARARGS,
-		_mysql_escape_string__doc__
-	},
-	{
-		"string_literal",
-		(PyCFunction)_mysql_string_literal,
-		METH_VARARGS,
-		_mysql_string_literal__doc__
-	},
-	{
 		"get_client_info",
 		(PyCFunction)_mysql_get_client_info,
 		METH_NOARGS,

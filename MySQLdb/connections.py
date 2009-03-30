@@ -135,10 +135,9 @@ class Connection(object):
 
         self.cursorclass = Cursor
         charset = kwargs2.pop('charset', '')
-        if 'decoders' not in kwargs2:
-            kwargs2['decoders'] = default_decoders;
-        self.decoders = kwargs2.pop('decoders', default_decoders) # XXX kwargs2['decoders']
-        self.encoders = conversions # XXX kwargs2.pop('encoders', default_encoders)
+        if 'decoder_stack' not in kwargs2:
+            kwargs2['decoder_stack'] = default_decoders;
+        self.encoders = kwargs2.pop('encoders', default_encoders)
         
         client_flag = kwargs.get('client_flag', 0)
         client_version = tuple(
@@ -184,18 +183,22 @@ class Connection(object):
     def close(self):
         return self._db.close()
     
-    def cursor(self, decoders=None, encoders=None):
+    def escape_string(self, s):
+        return self._db.escape_string(s)
+    
+    def string_literal(self, s):
+        return self._db.string_literal(s)
+    
+    def cursor(self, encoders=None):
         """
         Create a cursor on which queries may be performed. The optional
         cursorclass parameter is used to create the Cursor. By default,
         self.cursorclass=cursors.Cursor is used.
         """
-        if not decoders:
-            decoders = self.decoders[:]
         if not encoders:
-            encoders = self.encoders.copy() #[:]
+            encoders = self.encoders[:]
         
-        return self.cursorclass(self, decoders, encoders)
+        return self.cursorclass(self, encoders)
 
     def __enter__(self):
         return self.cursor()
@@ -208,13 +211,16 @@ class Connection(object):
             
     def literal(self, obj):
         """
-        If obj is a single object, returns an SQL literal as a string. If
-        obj is a non-string sequence, the items of the sequence are converted
-        and returned as a sequence.
+        Given an object obj, returns an SQL literal as a string.
 
-        Non-standard. For internal use; do not use this in your applications.
+        Non-standard.
         """
-        return self._db.escape(obj, self.encoders)
+        for encoder in self.encoders:
+            f = encoder(obj)
+            if f:
+                return f(self, obj)
+            
+        raise self.NotSupportedError("could not encode as SQL", obj)
 
     def _warning_count(self):
         """Return the number of warnings generated from the last query."""

@@ -13,7 +13,7 @@ class test_MySQLdb(capabilities.DatabaseTest):
     connect_kwargs = dict(db='test', read_default_file='~/.my.cnf',
                           charset='utf8', sql_mode="ANSI,STRICT_TRANS_TABLES,TRADITIONAL")
     create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8"
-    leak_test = True
+    leak_test = False
     
     def quote_identifier(self, ident):
         return "`%s`" % ident
@@ -96,6 +96,15 @@ class test_MySQLdb(capabilities.DatabaseTest):
     def test_ping(self):
         self.connection.ping()
 
+    def test_literal_int(self):
+        self.failUnless("2" == self.connection.literal(2))
+    
+    def test_literal_float(self):
+        self.failUnless("3.1415" == self.connection.literal(3.1415))
+        
+    def test_literal_string(self):
+        self.failUnless("'foo'" == self.connection.literal("foo"))
+        
     
 if __name__ == '__main__':
     if test_MySQLdb.leak_test:

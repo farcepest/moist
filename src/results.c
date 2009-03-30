@@ -2,8 +2,42 @@
 
 #include "mysqlmod.h"
 
+static PyObject *
+_mysql_ResultObject_get_fields(
+	_mysql_ResultObject *self,
+	PyObject *unused)
+{
+	PyObject *arglist=NULL, *kwarglist=NULL;
+	PyObject *fields=NULL;
+	_mysql_FieldObject *field=NULL;
+	unsigned int i, n;
+
+	check_result_connection(self);
+	kwarglist = PyDict_New();
+	if (!kwarglist) goto error;
+	n = mysql_num_fields(self->result);
+	if (!(fields = PyTuple_New(n))) return NULL;
+	for (i=0; i<n; i++) {
+		arglist = Py_BuildValue("(Oi)", self, i);
+		if (!arglist) goto error;
+		field = MyAlloc(_mysql_FieldObject, _mysql_FieldObject_Type);
+		if (!field) goto error;
+		if (_mysql_FieldObject_Initialize(field, arglist, kwarglist))
+			goto error;
+		Py_DECREF(arglist);
+		PyTuple_SET_ITEM(fields, i, (PyObject *) field);
+	}
+	Py_DECREF(kwarglist);
+	return fields;
+  error:
+	Py_XDECREF(arglist);
+	Py_XDECREF(kwarglist);
+	Py_XDECREF(fields);
+	return NULL;
+}
+
 static char _mysql_ResultObject__doc__[] =
-"result(connection, use=0, converter={}) -- Result set from a query.\n\
+"result(connection, use=0, decoder_stack=[]) -- Result set from a query.\n\
 \n\
 Creating instances of this class directly is an excellent way to\n\
 shoot yourself in the foot. If using _mysql.connection directly,\n\
@@ -17,19 +51,18 @@ _mysql_ResultObject_Initialize(
 	PyObject *args,
 	PyObject *kwargs)
 {
-	static char *kwlist[] = {"connection", "use", "converter", NULL};
+	static char *kwlist[] = {"connection", "use", "decoder_stack", NULL};
 	MYSQL_RES *result;
-	_mysql_ConnectionObject *conn=NULL;
-	int use=0;
-	PyObject *conv=NULL;
-	int n, i;
-	MYSQL_FIELD *fields;
+	_mysql_ConnectionObject *conn = NULL;
+	int use = 0;
+	PyObject *decoder_stack = NULL;
+	int n, ns, i, j;
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iO", kwlist,
-					  &conn, &use, &conv))
+					  &conn, &use, &decoder_stack))
 		return -1;
-	if (!conv) conv = PyDict_New();
-	if (!conv) return -1;
+	if (!decoder_stack) decoder_stack = PyList_New(0);
+	if (!decoder_stack) return -1;
 	self->conn = (PyObject *) conn;
 	Py_INCREF(conn);
 	self->use = use;
@@ -41,61 +74,32 @@ _mysql_ResultObject_Initialize(
 	self->result = result;
 	Py_END_ALLOW_THREADS ;
 	if (!result) {
-		self->converter = PyTuple_New(0);
+		self->decoders = PyTuple_New(0);
 		return 0;
 	}
 	n = mysql_num_fields(result);
+	ns = PySequence_Length(decoder_stack);
 	self->nfields = n;
-	if (!(self->converter = PyTuple_New(n))) return -1;
-	fields = mysql_fetch_fields(result);
+	if (!(self->decoders = PyTuple_New(n))) return -1;
+	self->fields = _mysql_ResultObject_get_fields(self, NULL);
 	for (i=0; i<n; i++) {
-		PyObject *tmp, *fun;
-		tmp = PyInt_FromLong((long) fields[i].type);
-		if (!tmp) return -1;
-		fun = PyObject_GetItem(conv, tmp);
-		Py_DECREF(tmp);
-		if (!fun) {
-			PyErr_Clear();
-			fun = Py_None;
-			Py_INCREF(Py_None);
-		}
-		if (PySequence_Check(fun)) {
-			int j, n2=PySequence_Size(fun);
-			PyObject *fun2=NULL;
-			for (j=0; j<n2; j++) {
-				PyObject *t = PySequence_GetItem(fun, j);
-				if (!t) continue;
-				if (!PyTuple_Check(t)) goto cleanup;
-				if (PyTuple_GET_SIZE(t) == 2) {
-					long mask;
-					PyObject *pmask=NULL;
-					pmask = PyTuple_GET_ITEM(t, 0);
-					fun2 = PyTuple_GET_ITEM(t, 1);
-					if (PyInt_Check(pmask)) {
-						mask = PyInt_AS_LONG(pmask);
-						if (mask & fields[i].flags) {
-							Py_DECREF(t);
-							break;
-						}
-						else {
-							goto cleanup;
-						}
-					} else {
-						Py_DECREF(t);
-						break;
-					}
-				}
-			  cleanup:
-				Py_DECREF(t);
+		PyObject *field = PyTuple_GET_ITEM(self->fields, i);
+		for (j=0; j<ns; j++) {
+			PyObject *df = PySequence_GetItem(decoder_stack, j);
+			if (!df) goto error;
+			PyObject *f = PyObject_CallFunctionObjArgs(df, field, NULL);
+			Py_DECREF(df);
+			if (!f) goto error;
+			if (f != Py_None) {
+				PyTuple_SET_ITEM(self->decoders, i, f);
+				break;
 			}
-			if (!fun2) fun2 = Py_None;
-			Py_INCREF(fun2);
-			Py_DECREF(fun);
-			fun = fun2;
+			Py_DECREF(f);
 		}
-		PyTuple_SET_ITEM(self->converter, i, fun);
 	}
 	return 0;
+	error:
+	return -1;
 }
 
 static int
@@ -105,8 +109,8 @@ _mysql_ResultObject_traverse(
 	void *arg)
 {
 	int r;
-	if (self->converter) {
-		if (!(r = visit(self->converter, arg))) return r;
+	if (self->decoders) {
+		if (!(r = visit(self->decoders, arg))) return r;
 	}
 	if (self->conn)
 		return visit(self->conn, arg);
@@ -117,8 +121,8 @@ static int
 _mysql_ResultObject_clear(
 	_mysql_ResultObject *self)
 {
-	Py_XDECREF(self->converter);
-	self->converter = NULL;
+	Py_XDECREF(self->decoders);
+	self->decoders = NULL;
 	Py_XDECREF(self->conn);
 	self->conn = NULL;
 	return 0;
@@ -161,45 +165,6 @@ _mysql_ResultObject_describe(
 	return NULL;
 }
 
-static char _mysql_ResultObject_fields__doc__[] =
-"Returns the sequence of 7-tuples required by the DB-API for\n\
-the Cursor.description attribute.\n\
-";
-
-static PyObject *
-_mysql_ResultObject_fields(
-	_mysql_ResultObject *self,
-	PyObject *unused)
-{
-	PyObject *arglist=NULL, *kwarglist=NULL;
-	PyObject *fields=NULL;
-	_mysql_FieldObject *field=NULL;
-	unsigned int i, n;
-
-	check_result_connection(self);
-	kwarglist = PyDict_New();
-	if (!kwarglist) goto error;
-	n = mysql_num_fields(self->result);
-	if (!(fields = PyTuple_New(n))) return NULL;
-	for (i=0; i<n; i++) {
-		arglist = Py_BuildValue("(Oi)", self, i);
-		if (!arglist) goto error;
-		field = MyAlloc(_mysql_FieldObject, _mysql_FieldObject_Type);
-		if (!field) goto error;
-		if (_mysql_FieldObject_Initialize(field, arglist, kwarglist))
-			goto error;
-		Py_DECREF(arglist);
-		PyTuple_SET_ITEM(fields, i, (PyObject *) field);
-	}
-	Py_DECREF(kwarglist);
-	return fields;
-  error:
-	Py_XDECREF(arglist);
-	Py_XDECREF(kwarglist);
-	Py_XDECREF(fields);
-	return NULL;
-}
-
 static char _mysql_ResultObject_field_flags__doc__[] =
 "Returns a tuple of field flags, one for each column in the result.\n\
 " ;
@@ -230,14 +195,14 @@ _mysql_ResultObject_field_flags(
 
 static PyObject *
 _mysql_field_to_python(
-	PyObject *converter,
+	PyObject *decoder,
 	char *rowitem,
 	unsigned long length)
 {
 	PyObject *v;
 	if (rowitem) {
-		if (converter != Py_None)
-			v = PyObject_CallFunction(converter,
+		if (decoder != Py_None)
+			v = PyObject_CallFunction(decoder,
 						  "s#",
 						  rowitem,
 						  (int)length);
@@ -267,7 +232,7 @@ _mysql_row_to_tuple(
 	length = mysql_fetch_lengths(self->result);
 	for (i=0; i<n; i++) {
 		PyObject *v;
-		c = PyTuple_GET_ITEM(self->converter, i);
+		c = PyTuple_GET_ITEM(self->decoders, i);
 		v = _mysql_field_to_python(c, row[i], length[i]);
 		if (!v) goto error;
 		PyTuple_SET_ITEM(r, i, v);
@@ -294,7 +259,7 @@ _mysql_row_to_dict(
         fields = mysql_fetch_fields(self->result);
 	for (i=0; i<n; i++) {
 		PyObject *v;
-		c = PyTuple_GET_ITEM(self->converter, i);
+		c = PyTuple_GET_ITEM(self->decoders, i);
 		v = _mysql_field_to_python(c, row[i], length[i]);
 		if (!v) goto error;
 		if (!PyMapping_HasKeyString(r, fields[i].name)) {
@@ -333,7 +298,7 @@ _mysql_row_to_dict_old(
         fields = mysql_fetch_fields(self->result);
 	for (i=0; i<n; i++) {
 		PyObject *v;
-		c = PyTuple_GET_ITEM(self->converter, i);
+		c = PyTuple_GET_ITEM(self->decoders, i);
 		v = _mysql_field_to_python(c, row[i], length[i]);
 		if (!v) goto error;
 		{
@@ -595,12 +560,6 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 		_mysql_ResultObject_describe__doc__
 	},
 	{
-		"fields",
-		(PyCFunction)_mysql_ResultObject_fields,
-		METH_NOARGS,
-		_mysql_ResultObject_fields__doc__
-	},
-	{
 		"fetch_row",
 		(PyCFunction)_mysql_ResultObject_fetch_row,
 		METH_VARARGS | METH_KEYWORDS,
@@ -636,13 +595,19 @@ static struct PyMemberDef _mysql_ResultObject_memberlist[] = {
 		"Connection associated with result"
 	},
 	{
-		"converter",
+		"decoders",
 		T_OBJECT,
-		offsetof(_mysql_ResultObject, converter),
+		offsetof(_mysql_ResultObject, decoders),
 		RO,
-		"Type conversion mapping"
+		"Field decoders for result set"
 	},
-	{NULL} /* Sentinel */
+	{
+		"fields",
+		T_OBJECT,
+		offsetof(_mysql_ResultObject, fields),
+		RO,
+		"Field metadata for result set"
+	},	{NULL} /* Sentinel */
 };
 
 static PyObject *

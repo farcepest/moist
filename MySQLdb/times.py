@@ -12,7 +12,6 @@ __author__ = "$Author$"[9:-2]
 
 from time import localtime
 from datetime import date, datetime, time, timedelta
-from _mysql import string_literal
 
 # These are required for DB-API (PEP-249)
 Date = date
@@ -192,17 +191,17 @@ def date_or_None(obj):
     
     """
     try:
-        return date(*[ int(x) for x in obj.split('-', 2) ])
+        return date(*map(int, obj.split('-', 2)))
     except ValueError:
         return None
 
-def datetime_to_sql(obj, conv):
+def datetime_to_sql(connection, obj):
     """Format a DateTime object as an ISO timestamp."""
-    return string_literal(datetime_to_str(obj), conv)
+    return connection.string_literal(datetime_to_str(obj))
     
-def timedelta_to_sql(obj, conv):
+def timedelta_to_sql(connection, obj):
     """Format a timedelta as an SQL literal."""
-    return string_literal(timedelta_to_str(obj), conv)
+    return connection.string_literal(timedelta_to_str(obj))
 
 def mysql_timestamp_converter(timestamp):
     """Convert a MySQL TIMESTAMP to a Timestamp object.

@@ -45,7 +45,7 @@ class Cursor(object):
     _defer_warnings = False
     _fetch_type = None
 
-    def __init__(self, connection, decoders, encoders):
+    def __init__(self, connection, encoders):
         from MySQLdb.converters import default_decoders
         self.connection = weakref.proxy(connection)
         self.description = None
@@ -60,7 +60,7 @@ class Cursor(object):
         self._warnings = 0
         self._info = None
         self.rownumber = None
-        self._decoders = decoders
+        self._encoders = encoders
 
     def __del__(self):
         self.close()
@@ -117,25 +117,10 @@ class Cursor(object):
         self._warning_check()
         return True
 
-    def _lookup_decoder(self, field):
-        from MySQLdb.converters import filter_NULL
-        for plugin in self._decoders:
-            f = plugin(field)
-            if f:
-                return filter_NULL(f)
-        return None # this should never happen   
-
     def _do_get_result(self):
         """Get the result from the last query."""
         connection = self._get_db()
         self._result = self._get_result()
-        if self._result:
-            self.sql_to_python = [ 
-                self._lookup_decoder(f)
-                for f in self._result.fields()
-            ]
-        else:
-            self.sql_to_python = []
         self.rowcount = connection.affected_rows()
         self.rownumber = 0
         self.description = self._result and self._result.describe() or None
@@ -176,9 +161,9 @@ class Cursor(object):
         charset = db.character_set_name()
         if isinstance(query, unicode):
             query = query.encode(charset)
-        if args is not None:
-            query = query % self.connection.literal(args)
         try:
+            if args is not None:
+                query = query % tuple(map(self.connection.literal, args))
             result = self._query(query)
         except TypeError, msg:
             if msg.args[0] in ("not enough arguments for format string",
@@ -235,7 +220,11 @@ class Cursor(object):
         values = matched.group('values')
  
         try:
-            sql_params = [ values % self.connection.literal(arg) for arg in args ]
+            sql_params = ( values % tuple(map(self.connection.literal, row)) for row in args )
+            multirow_query = '\n'.join([start, ',\n'.join(sql_params), end])
+            self._executed = multirow_query
+            self.rowcount = int(self._query(multirow_query))
+
         except TypeError, msg:
             if msg.args[0] in ("not enough arguments for format string",
                                "not all arguments converted"):
@@ -248,9 +237,7 @@ class Cursor(object):
             exc, value, traceback = sys.exc_info()
             del traceback
             self.errorhandler(self, exc, value)
-        self.rowcount = int(self._query(
-            '\n'.join([start, ',\n'.join(sql_params), end,
-        ])))
+        
         if not self._defer_warnings:
             self._warning_check()
         return self.rowcount
@@ -319,14 +306,7 @@ class Cursor(object):
         """Low-level fetch_row wrapper."""
         if not self._result:
             return ()
-        # unfortunately it is necessary to wrap these generators up as tuples
-        # as the rows are expected to be subscriptable.
-        return tuple(
-            ( 
-                tuple( ( f(x) for f, x in zip(self.sql_to_python, row) ) )
-                for row in self._result.fetch_row(size, self._fetch_type)
-            )
-        )
+        return self._result.fetch_row(size, self._fetch_type)
 
     def __iter__(self):
         return iter(self.fetchone, None)

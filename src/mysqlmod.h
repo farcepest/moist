@@ -26,7 +26,7 @@ typedef struct {
 	PyObject_HEAD
 	MYSQL connection;
 	int open;
-	PyObject *converter;
+	PyObject *decoder_stack;
 } _mysql_ConnectionObject;
 
 #define check_connection(c) if (!(c->open)) return _mysql_Exception(c)
@@ -41,7 +41,8 @@ typedef struct {
 	MYSQL_RES *result;
 	int nfields;
 	int use;
-	PyObject *converter;
+	PyObject *decoders;
+	PyObject *fields;
 } _mysql_ResultObject;
 
 extern PyTypeObject _mysql_ResultObject_Type;

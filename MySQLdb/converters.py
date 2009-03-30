@@ -34,7 +34,7 @@ MySQL.connect().
 
 """
 
-from _mysql import string_literal, escape_sequence, escape_dict, NULL
+from _mysql import NULL
 from MySQLdb.constants import FIELD_TYPE, FLAG
 from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
      timedelta_or_None, datetime_or_None, date_or_None, \
@@ -47,7 +47,7 @@ from decimal import Decimal
 __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
 
-def bool_to_sql(boolean, conv):
+def bool_to_sql(connection, boolean):
     """Convert a Python bool to an SQL literal."""
     return str(int(boolean))
 
@@ -55,37 +55,33 @@ def SET_to_Set(value):
     """Convert MySQL SET column to Python set."""
     return set([ i for i in value.split(',') if i ])
 
-def Set_to_sql(value, conv):
+def Set_to_sql(connection, value):
     """Convert a Python set to an SQL literal."""
-    return string_literal(','.join(value), conv)
+    return connection.string_literal(','.join(value))
 
-def object_to_sql(obj, conv):
-    """Convert something into a string via str()."""
-    return str(obj)
+def object_to_sql(connection, obj):
+    """Convert something into a string via str().
+    The result will not be quoted."""
+    return connection.escape_string(str(obj))
 
-def unicode_to_sql(value, conv):
-    """Convert a unicode object to a string using the default encoding.
-    This is only used as a placeholder for the real function, which
-    is connection-dependent."""
-    assert isinstance(value, unicode)
-    return value.encode()
+def unicode_to_sql(connection, value):
+    """Convert a unicode object to a string using the connection encoding."""
+    return connection.string_literal(value.encode(connection.character_set_name()))
 
-def float_to_sql(value, conv):
+def float_to_sql(connection, value):
     return '%.15g' % value
 
-def None_to_sql(value, conv):
+def None_to_sql(connection, value):
     """Convert None to NULL."""
     return NULL # duh
 
-def object_to_quoted_sql(obj, conv):
-    """Convert something into a SQL string literal.  If using
-    MySQL-3.23 or newer, string_literal() is a method of the
-    _mysql.MYSQL object, and this function will be overridden with
-    that method when the connection is created."""
+def object_to_quoted_sql(connection, obj):
+    """Convert something into a SQL string literal."""
+    if hasattr(obj, "__unicode__"):
+        return unicode_to_sql(connection, obj)
+    return connection.string_literal(str(obj))
 
-    return string_literal(obj, conv)
-
-def instance_to_sql(obj, conv):
+def instance_to_sql(connection, obj):
     """Convert an Instance to a string representation.  If the __str__()
     method produces acceptable output, then you don't need to add the
     class to conversions; it will be handled by the default
@@ -101,22 +97,14 @@ def instance_to_sql(obj, conv):
     conv[obj.__class__] = conv[classes[0]]
     return conv[classes[0]](obj, conv)
 
-def char_array(obj):
-    return array.array('c', obj)
-
-def array_to_sql(obj, conv):
-    return object_to_quoted_sql(obj.tostring(), conv)
+def array_to_sql(connection, obj):
+    return connection.string_literal(obj.tostring())
 
 simple_type_encoders = {
     int: object_to_sql,
     long: object_to_sql,
     float: float_to_sql,
     type(None): None_to_sql,
-    tuple: escape_sequence,
-    list: escape_sequence,
-    dict: escape_dict,
-    InstanceType: instance_to_sql,
-    array.array: array_to_sql,
     unicode: unicode_to_sql,
     object: instance_to_sql,
     bool: bool_to_sql,
@@ -156,18 +144,17 @@ simple_field_decoders = {
 # returns None, this decoder will be ignored and the next decoder
 # on the stack will be checked.
 
-def filter_NULL(f):
-    def _filter_NULL(o):
-        if o is None: return o
-        return f(o)
-    _filter_NULL.__name__ = f.__name__
-    return _filter_NULL
-
 def default_decoder(field):
     return str
 
+def default_encoder(value):
+    return object_to_quoted_sql
+    
 def simple_decoder(field):
     return simple_field_decoders.get(field.type, None)
+
+def simple_encoder(value):
+    return simple_type_encoders.get(type(value), None)
 
 character_types = [
     FIELD_TYPE.BLOB, 
@@ -195,6 +182,8 @@ default_decoders = [
     ]
 
 default_encoders = [
+    simple_encoder,
+    default_encoder,
     ]
 
 
