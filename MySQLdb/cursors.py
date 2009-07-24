@@ -87,7 +87,7 @@ class Cursor(object):
         """Check for warnings, and report via the warnings module."""
         from warnings import warn
         if self._warnings:
-            warnings = self._get_db().show_warnings()
+            warnings = self._get_db()._show_warnings()
             if warnings:
                 # This is done in two loops in case
                 # Warnings are set to raise exceptions.
@@ -107,7 +107,7 @@ class Cursor(object):
         if self._executed:
             self.fetchall()
         del self.messages[:]
-        
+
         connection = self._get_db()
         num_rows = connection.next_result()
         if num_rows == -1:
