@@ -61,9 +61,7 @@ static PyObject *
 _mysql_FieldObject_repr(
 	_mysql_FieldObject *self)
 {
-	char buf[300];
-	snprintf(buf, 300, "<_mysql.field object at %lx>", (long)self);
-	return PyString_FromString(buf);
+	return PyString_FromFormat("<_mysql.field object at %p>", self);
 }
 
 static PyMethodDef _mysql_FieldObject_methods[] = {
