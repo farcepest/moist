@@ -49,12 +49,6 @@ _mysql_ConnectionObject_Initialize(
 					 ))
 		return -1;
 
-	if (!decoder_stack)
-		decoder_stack = PyList_New(0);
-	else
-		Py_INCREF(decoder_stack);
-	self->decoder_stack = decoder_stack;
-	
 #define _stringsuck(d,t,s) {t=PyMapping_GetItemString(s,#d);\
         if(t){d=PyString_AsString(t);Py_DECREF(t);}\
         PyErr_Clear();}
@@ -112,6 +106,13 @@ _mysql_ConnectionObject_Initialize(
 		_mysql_Exception(self);
 		return -1;
 	}
+
+	if (!decoder_stack)
+		decoder_stack = PyList_New(0);
+	else
+		Py_INCREF(decoder_stack);
+	self->decoder_stack = decoder_stack;
+
 	/*
 	  PyType_GenericAlloc() automatically sets up GC allocation and
 	  tracking for GC objects, at least in 2.2.1, so it does not need to
