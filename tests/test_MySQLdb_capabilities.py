@@ -13,7 +13,7 @@ class test_MySQLdb(capabilities.DatabaseTest):
     connect_kwargs = dict(db='test', read_default_file='~/.my.cnf',
                           charset='utf8', sql_mode="ANSI,STRICT_TRANS_TABLES,TRADITIONAL")
     create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8"
-    leak_test = False
+    leak_test = True
     
     def quote_identifier(self, ident):
         return "`%s`" % ident

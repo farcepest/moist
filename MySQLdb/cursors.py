@@ -2,8 +2,8 @@
 MySQLdb Cursors
 ---------------
 
-This module implements Cursors of various types for MySQLdb. By
-default, MySQLdb uses the Cursor class.
+This module implements the Cursor class. You should not try to
+create Cursors direction; use connection.cursor() instead.
 
 """
 
@@ -27,12 +27,6 @@ class Cursor(object):
         A tuple of DB API 7-tuples describing the columns in
         the last executed query; see PEP-249 for details.
 
-    description_flags
-        Tuple of column flags for last query, one entry per column
-        in the result set. Values correspond to those in
-        MySQLdb.constants.FLAG. See MySQL documentation (C API)
-        for more information. Non-standard extension.
-    
     arraysize
         default number of rows fetchmany() will fetch
 
@@ -212,13 +206,13 @@ class Cursor(object):
             query = query.encode(charset)
         matched = INSERT_VALUES.match(query)
         if not matched:
-            self.rowcount = sum([ self.execute(query, arg) for arg in args ])
+            self.rowcount = sum(( self.execute(query, arg) for arg in args ))
             return self.rowcount
         
         start = matched.group('start')
-        end = matched.group('end')
         values = matched.group('values')
- 
+        end = matched.group('end')
+
         try:
             sql_params = ( values % tuple(map(self.connection.literal, row)) for row in args )
             multirow_query = '\n'.join([start, ',\n'.join(sql_params), end])

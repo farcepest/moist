@@ -169,9 +169,12 @@ class Connection(object):
         self.messages = []
     
     def autocommit(self, do_autocommit):
+        self._autocommit = do_autocommit
         return self._db.autocommit(do_autocommit)
 
     def ping(self, reconnect=False):
+        if reconnect and not self._autocommit:
+            raise ProgrammingError("autocommit must be enabled before enabling auto-reconnect; consider the consequences")
         return self._db.ping(reconnect)
     
     def commit(self):
