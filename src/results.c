@@ -429,6 +429,85 @@ _mysql_ResultObject_fetch_row(
 	return NULL;
 }
 
+static char _mysql_ResultObject_simple_fetch_row__doc__[] =
+"simple_fetchrow()\n\
+  Fetches one row as a tuple of strings.\n\
+  NULL is returned as None.\n\
+";
+
+static PyObject *
+_mysql_ResultObject_simple_fetch_row(
+	_mysql_ResultObject *self,
+	PyObject *unused)
+{
+	unsigned int n, i;
+	unsigned long *length;
+	PyObject *r=NULL;
+	MYSQL_ROW row;
+	
+	check_result_connection(self);
+	
+	if (!self->use)
+		row = mysql_fetch_row(self->result);
+	else {
+		Py_BEGIN_ALLOW_THREADS;
+		row = mysql_fetch_row(self->result);
+		Py_END_ALLOW_THREADS;
+	}
+	if (!row && mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
+		_mysql_Exception((_mysql_ConnectionObject *)self->conn);
+		goto error;
+	}
+	if (!row) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	
+	n = mysql_num_fields(self->result);
+	if (!(r = PyTuple_New(n))) return NULL;
+	length = mysql_fetch_lengths(self->result);
+	for (i=0; i<n; i++) {
+		PyObject *v;
+		if (row[i]) {
+			v = PyString_FromStringAndSize(row[i], length[i]);
+			if (!v) goto error;
+		} else /* NULL */ {
+			v = Py_None;
+			Py_INCREF(v);
+		}
+		PyTuple_SET_ITEM(r, i, v);
+	}
+	return r;
+  error:
+	Py_XDECREF(r);
+	return NULL;
+}
+
+static PyObject *
+_mysql_ResultObject__iter__(
+	_mysql_ResultObject *self,
+	PyObject *unused)
+{
+	check_result_connection(self);
+	Py_INCREF(self);
+	return (PyObject *)self;
+}
+
+static PyObject *
+_mysql_ResultObject_next(
+	_mysql_ResultObject *self,
+	PyObject *unused)
+{
+	PyObject *row;
+	check_result_connection(self);
+	row = _mysql_ResultObject_simple_fetch_row(self, NULL);
+	if (row == Py_None) {
+		Py_DECREF(row);
+		PyErr_SetString(PyExc_StopIteration, "");
+		return NULL;
+	}
+	return row;
+}
 
 static char _mysql_ResultObject_num_fields__doc__[] =
 "Returns the number of fields (column) in the result." ;
@@ -566,6 +645,13 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 		_mysql_ResultObject_fetch_row__doc__
 	},
 	{
+		"simple_fetch_row",
+		(PyCFunction)_mysql_ResultObject_simple_fetch_row,
+		METH_VARARGS | METH_KEYWORDS,
+		_mysql_ResultObject_simple_fetch_row__doc__
+	},
+
+	{
 		"field_flags",
 		(PyCFunction)_mysql_ResultObject_field_flags,
 		METH_NOARGS,
@@ -607,7 +693,15 @@ static struct PyMemberDef _mysql_ResultObject_memberlist[] = {
 		offsetof(_mysql_ResultObject, fields),
 		RO,
 		"Field metadata for result set"
-	},	{NULL} /* Sentinel */
+	},
+	{
+		"use",
+		T_INT,
+		offsetof(_mysql_ResultObject, use),
+		RO,
+		"True if mysql_use_result() was used; False if mysql_store_result() was used"
+	},
+	{NULL} /* Sentinel */
 };
 
 static PyObject *
@@ -700,8 +794,8 @@ PyTypeObject _mysql_ResultObject_Type = {
 	0, /* (long) tp_weaklistoffset */
 
 	/* Iterators */
-	0, /* (getiterfunc) tp_iter */
-	0, /* (iternextfunc) tp_iternext */
+	(getiterfunc) _mysql_ResultObject__iter__, /* (getiterfunc) tp_iter */
+	(iternextfunc) _mysql_ResultObject_next, /* (iternextfunc) tp_iternext */
 
 	/* Attribute descriptor and subclassing stuff */
 	(struct PyMethodDef *)_mysql_ResultObject_methods, /* tp_methods */
