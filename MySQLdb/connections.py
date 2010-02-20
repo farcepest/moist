@@ -138,6 +138,7 @@ class Connection(object):
         if 'decoder_stack' not in kwargs2:
             kwargs2['decoder_stack'] = default_decoders;
         self.encoders = kwargs2.pop('encoders', default_encoders)
+        self.decoders = kwargs2.pop('decoders', default_decoders)
         
         client_flag = kwargs.get('client_flag', 0)
         client_version = tuple(
@@ -167,6 +168,7 @@ class Connection(object):
             # PEP-249 requires autocommit to be initially off
             self.autocommit(False)
         self.messages = []
+        self._active_cursor = None
     
     def autocommit(self, do_autocommit):
         self._autocommit = do_autocommit
@@ -192,16 +194,23 @@ class Connection(object):
     def string_literal(self, s):
         return self._db.string_literal(s)
     
-    def cursor(self, encoders=None):
+    def cursor(self, encoders=None, decoders=None):
         """
         Create a cursor on which queries may be performed. The optional
         cursorclass parameter is used to create the Cursor. By default,
         self.cursorclass=cursors.Cursor is used.
         """
+        if self._active_cursor:
+            self._active_cursor._flush()
+            
         if not encoders:
             encoders = self.encoders[:]
         
-        return self.cursorclass(self, encoders)
+        if not decoders:
+            decoders = self.decoders[:]
+            
+        self._active_cursor = self.cursorclass(self, encoders, decoders)
+        return self._active_cursor
 
     def __enter__(self):
         return self.cursor()

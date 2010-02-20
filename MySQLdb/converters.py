@@ -15,6 +15,7 @@ from types import InstanceType
 import array
 import datetime
 from decimal import Decimal
+from itertools import izip
 
 __revision__ = "$Revision$"[11:-2]
 __author__ = "$Author$"[9:-2]
@@ -143,6 +144,8 @@ def character_decoder(field):
     
     charset = field.result.connection.character_set_name()
     def char_to_unicode(s):
+        if s is None:
+            return s
         return s.decode(charset)
     
     return char_to_unicode
@@ -157,6 +160,23 @@ default_encoders = [
     simple_encoder,
     default_encoder,
     ]
+
+def get_codec(field, codecs):
+    for c in codecs:
+        func = c(field)
+        if func:
+            return func
+    # the default codec is guaranteed to work
+
+def iter_row_decoder(decoders, row):
+    if row is None:
+        return None
+    return ( d(col) for d, col in izip(decoders, row) )
+
+def tuple_row_decoder(decoders, row):
+    if row is None:
+        return None
+    return tuple(iter_row_decoder(decoders, row))
 
 
 
