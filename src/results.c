@@ -37,7 +37,7 @@ _mysql_ResultObject_get_fields(
 }
 
 static char _mysql_ResultObject__doc__[] =
-"result(connection, use=0, decoder_stack=[]) -- Result set from a query.\n\
+"result(connection, use=0) -- Result set from a query.\n\
 \n\
 Creating instances of this class directly is an excellent way to\n\
 shoot yourself in the foot. If using _mysql.connection directly,\n\
@@ -51,18 +51,16 @@ _mysql_ResultObject_Initialize(
 	PyObject *args,
 	PyObject *kwargs)
 {
-	static char *kwlist[] = {"connection", "use", "decoder_stack", NULL};
+	static char *kwlist[] = {"connection", "use", NULL};
 	MYSQL_RES *result;
 	_mysql_ConnectionObject *conn = NULL;
 	int use = 0;
-	PyObject *decoder_stack = NULL;
-	int n, ns, i, j;
+	int n;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iO", kwlist,
-					  &conn, &use, &decoder_stack))
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|i", kwlist,
+					  &conn, &use))
 		return -1;
-	if (!decoder_stack) decoder_stack = PyList_New(0);
-	if (!decoder_stack) return -1;
+
 	self->conn = (PyObject *) conn;
 	Py_INCREF(conn);
 	self->use = use;
@@ -74,32 +72,13 @@ _mysql_ResultObject_Initialize(
 	self->result = result;
 	Py_END_ALLOW_THREADS ;
 	if (!result) {
-		self->decoders = PyTuple_New(0);
 		return 0;
 	}
 	n = mysql_num_fields(result);
-	ns = PySequence_Length(decoder_stack);
 	self->nfields = n;
-	if (!(self->decoders = PyTuple_New(n))) return -1;
 	self->fields = _mysql_ResultObject_get_fields(self, NULL);
-	for (i=0; i<n; i++) {
-		PyObject *field = PyTuple_GET_ITEM(self->fields, i);
-		for (j=0; j<ns; j++) {
-			PyObject *df = PySequence_GetItem(decoder_stack, j);
-			if (!df) goto error;
-			PyObject *f = PyObject_CallFunctionObjArgs(df, field, NULL);
-			Py_DECREF(df);
-			if (!f) goto error;
-			if (f != Py_None) {
-				PyTuple_SET_ITEM(self->decoders, i, f);
-				break;
-			}
-			Py_DECREF(f);
-		}
-	}
+
 	return 0;
-	error:
-	return -1;
 }
 
 static int
@@ -109,22 +88,11 @@ _mysql_ResultObject_traverse(
 	void *arg)
 {
 	int r;
-	if (self->decoders) {
-		if (!(r = visit(self->decoders, arg))) return r;
+	if (self->fields) {
+		if (!(r = visit(self->fields, arg))) return r;
 	}
 	if (self->conn)
 		return visit(self->conn, arg);
-	return 0;
-}
-
-static int
-_mysql_ResultObject_clear(
-	_mysql_ResultObject *self)
-{
-	Py_XDECREF(self->decoders);
-	self->decoders = NULL;
-	Py_XDECREF(self->conn);
-	self->conn = NULL;
 	return 0;
 }
 
@@ -165,6 +133,61 @@ _mysql_ResultObject_describe(
 	return NULL;
 }
 
+static char _mysql_ResultObject_fetch_row__doc__[] =
+"fetchrow()\n\
+  Fetches one row as a tuple of strings.\n\
+  NULL is returned as None.\n\
+  A single None indicates the end of the result set.\n\
+";
+
+static PyObject *
+_mysql_ResultObject_fetch_row(
+	_mysql_ResultObject *self,
+ 	PyObject *unused)
+ {
+	unsigned int n, i;
+	unsigned long *length;
+	PyObject *r=NULL;
+	MYSQL_ROW row;
+	
+ 	check_result_connection(self);
+ 	
+	if (!self->use)
+		row = mysql_fetch_row(self->result);
+	else {
+ 		Py_BEGIN_ALLOW_THREADS;
+		row = mysql_fetch_row(self->result);
+ 		Py_END_ALLOW_THREADS;
+	}
+	if (!row && mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
+		_mysql_Exception((_mysql_ConnectionObject *)self->conn);
+		goto error;
+	}
+	if (!row) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	
+	n = mysql_num_fields(self->result);
+	if (!(r = PyTuple_New(n))) return NULL;
+	length = mysql_fetch_lengths(self->result);
+	for (i=0; i<n; i++) {
+		PyObject *v;
+		if (row[i]) {
+			v = PyString_FromStringAndSize(row[i], length[i]);
+			if (!v) goto error;
+		} else /* NULL */ {
+			v = Py_None;
+			Py_INCREF(v);
+ 		}
+		PyTuple_SET_ITEM(r, i, v);
+ 	}
+	return r;
+  error:
+	Py_XDECREF(r);
+	return NULL;
+}
+
 static char _mysql_ResultObject_field_flags__doc__[] =
 "Returns a tuple of field flags, one for each column in the result.\n\
 " ;
@@ -193,294 +216,40 @@ _mysql_ResultObject_field_flags(
 	return NULL;
 }
 
-static PyObject *
-_mysql_field_to_python(
-	PyObject *decoder,
-	char *rowitem,
-	unsigned long length)
-{
-	PyObject *v;
-	if (rowitem) {
-		if (decoder != Py_None)
-			v = PyObject_CallFunction(decoder,
-						  "s#",
-						  rowitem,
-						  (int)length);
-		else
-			v = PyString_FromStringAndSize(rowitem,
-						       (int)length);
-		if (!v)
-			return NULL;
-	} else {
-		Py_INCREF(Py_None);
-		v = Py_None;
-	}
-	return v;
-}
-
-static PyObject *
-_mysql_row_to_tuple(
-	_mysql_ResultObject *self,
-	MYSQL_ROW row)
-{
-	unsigned int n, i;
-	unsigned long *length;
-	PyObject *r, *c;
-
-	n = mysql_num_fields(self->result);
-	if (!(r = PyTuple_New(n))) return NULL;
-	length = mysql_fetch_lengths(self->result);
-	for (i=0; i<n; i++) {
-		PyObject *v;
-		c = PyTuple_GET_ITEM(self->decoders, i);
-		v = _mysql_field_to_python(c, row[i], length[i]);
-		if (!v) goto error;
-		PyTuple_SET_ITEM(r, i, v);
-	}
-	return r;
-  error:
-	Py_XDECREF(r);
-	return NULL;
-}
-
-static PyObject *
-_mysql_row_to_dict(
-	_mysql_ResultObject *self,
-	MYSQL_ROW row)
-{
-	unsigned int n, i;
-	unsigned long *length;
-	PyObject *r, *c;
-        MYSQL_FIELD *fields;
-
-	n = mysql_num_fields(self->result);
-	if (!(r = PyDict_New())) return NULL;
-	length = mysql_fetch_lengths(self->result);
-        fields = mysql_fetch_fields(self->result);
-	for (i=0; i<n; i++) {
-		PyObject *v;
-		c = PyTuple_GET_ITEM(self->decoders, i);
-		v = _mysql_field_to_python(c, row[i], length[i]);
-		if (!v) goto error;
-		if (!PyMapping_HasKeyString(r, fields[i].name)) {
-			PyMapping_SetItemString(r, fields[i].name, v);
-		} else {
-			int len;
-			char buf[256];
-			strncpy(buf, fields[i].table, 256);
-			len = strlen(buf);
-			strncat(buf, ".", 256-len);
-			len = strlen(buf);
-			strncat(buf, fields[i].name, 256-len);
-			PyMapping_SetItemString(r, buf, v);
-		}
-		Py_DECREF(v);
-	}
-	return r;
-  error:
-	Py_XDECREF(r);
-	return NULL;
-}
-
-static PyObject *
-_mysql_row_to_dict_old(
-	_mysql_ResultObject *self,
-	MYSQL_ROW row)
-{
-	unsigned int n, i;
-	unsigned long *length;
-	PyObject *r, *c;
-        MYSQL_FIELD *fields;
-
-	n = mysql_num_fields(self->result);
-	if (!(r = PyDict_New())) return NULL;
-	length = mysql_fetch_lengths(self->result);
-        fields = mysql_fetch_fields(self->result);
-	for (i=0; i<n; i++) {
-		PyObject *v;
-		c = PyTuple_GET_ITEM(self->decoders, i);
-		v = _mysql_field_to_python(c, row[i], length[i]);
-		if (!v) goto error;
-		{
-			int len=0;
-			char buf[256]="";
-			if (strlen(fields[i].table)) {
-				strncpy(buf, fields[i].table, 256);
-				len = strlen(buf);
-				strncat(buf, ".", 256-len);
-				len = strlen(buf);
-			}
-			strncat(buf, fields[i].name, 256-len);
-			PyMapping_SetItemString(r, buf, v);
-		}
-		Py_DECREF(v);
-	}
-	return r;
-  error:
-	Py_XDECREF(r);
-	return NULL;
-}
-
 typedef PyObject *_PYFUNC(_mysql_ResultObject *, MYSQL_ROW);
 
-int
-_mysql__fetch_row(
-	_mysql_ResultObject *self,
-	PyObject **r,
-	int skiprows,
-	int maxrows,
-	_PYFUNC *convert_row)
-{
-	unsigned int i;
-	MYSQL_ROW row;
-
-	for (i = skiprows; i<(skiprows+maxrows); i++) {
-		PyObject *v;
-		if (!self->use)
-			row = mysql_fetch_row(self->result);
-		else {
-			Py_BEGIN_ALLOW_THREADS;
-			row = mysql_fetch_row(self->result);
-			Py_END_ALLOW_THREADS;
-		}
-		if (!row && mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
-			_mysql_Exception((_mysql_ConnectionObject *)self->conn);
-			goto error;
-		}
-		if (!row) {
-			if (_PyTuple_Resize(r, i) == -1) goto error;
-			break;
-		}
-		v = convert_row(self, row);
-		if (!v) goto error;
-		PyTuple_SET_ITEM(*r, i, v);
-	}
-	return i-skiprows;
-  error:
-	return -1;
-}
-
-static char _mysql_ResultObject_fetch_row__doc__[] =
-"fetch_row([maxrows, how]) -- Fetches up to maxrows as a tuple.\n\
-The rows are formatted according to how:\n\
-\n\
-    0 -- tuples (default)\n\
-    1 -- dictionaries, key=column or table.column if duplicated\n\
-    2 -- dictionaries, key=table.column\n\
+static char _mysql_ResultObject_clear__doc__[] =
+"clear()\n\
+  Reads to the end of the result set, discarding all the rows.\n\
 ";
 
 static PyObject *
-_mysql_ResultObject_fetch_row(
-	_mysql_ResultObject *self,
-	PyObject *args,
-	PyObject *kwargs)
-{
-	typedef PyObject *_PYFUNC(_mysql_ResultObject *, MYSQL_ROW);
-	static char *kwlist[] = { "maxrows", "how", NULL };
-	static _PYFUNC *row_converters[] =
-	{
-		_mysql_row_to_tuple,
-		_mysql_row_to_dict,
-		_mysql_row_to_dict_old
-	};
-	_PYFUNC *convert_row;
-	unsigned int maxrows=1, how=0, skiprows=0, rowsadded;
-	PyObject *r=NULL;
-
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ii:fetch_row", kwlist,
-					 &maxrows, &how))
-		return NULL;
-	check_result_connection(self);
-	if (how < 0 || how >= sizeof(row_converters)) {
-		PyErr_SetString(PyExc_ValueError, "how out of range");
-		return NULL;
-	}
-	convert_row = row_converters[how];
-	if (maxrows) {
-		if (!(r = PyTuple_New(maxrows))) goto error;
-		rowsadded = _mysql__fetch_row(self, &r, skiprows, maxrows,
-				convert_row);
-		if (rowsadded == -1) goto error;
-	} else {
-		if (self->use) {
-			maxrows = 1000;
-			if (!(r = PyTuple_New(maxrows))) goto error;
-			while (1) {
-				rowsadded = _mysql__fetch_row(self, &r, skiprows,
-						maxrows, convert_row);
-				if (rowsadded == -1) goto error;
-				skiprows += rowsadded;
-				if (rowsadded < maxrows) break;
-				if (_PyTuple_Resize(&r, skiprows + maxrows) == -1)
-				        goto error;
-			}
-		} else {
-			/* XXX if overflow, maxrows<0? */
-			maxrows = (int) mysql_num_rows(self->result);
-			if (!(r = PyTuple_New(maxrows))) goto error;
-			rowsadded = _mysql__fetch_row(self, &r, 0,
-					maxrows, convert_row);
-			if (rowsadded == -1) goto error;
-		}
-	}
-	return r;
-  error:
-	Py_XDECREF(r);
-	return NULL;
-}
-
-static char _mysql_ResultObject_simple_fetch_row__doc__[] =
-"simple_fetchrow()\n\
-  Fetches one row as a tuple of strings.\n\
-  NULL is returned as None.\n\
-";
-
-static PyObject *
-_mysql_ResultObject_simple_fetch_row(
+_mysql_ResultObject_clear(
 	_mysql_ResultObject *self,
 	PyObject *unused)
 {
-	unsigned int n, i;
-	unsigned long *length;
-	PyObject *r=NULL;
-	MYSQL_ROW row;
-	
-	check_result_connection(self);
-	
-	if (!self->use)
-		row = mysql_fetch_row(self->result);
-	else {
-		Py_BEGIN_ALLOW_THREADS;
-		row = mysql_fetch_row(self->result);
-		Py_END_ALLOW_THREADS;
-	}
-	if (!row && mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
-		_mysql_Exception((_mysql_ConnectionObject *)self->conn);
-		goto error;
-	}
-	if (!row) {
-		Py_INCREF(Py_None);
-		return Py_None;
-	}
-	
-	n = mysql_num_fields(self->result);
-	if (!(r = PyTuple_New(n))) return NULL;
-	length = mysql_fetch_lengths(self->result);
-	for (i=0; i<n; i++) {
-		PyObject *v;
-		if (row[i]) {
-			v = PyString_FromStringAndSize(row[i], length[i]);
-			if (!v) goto error;
-		} else /* NULL */ {
-			v = Py_None;
-			Py_INCREF(v);
+	if (self->result) {
+		if (self->use) {
+			Py_BEGIN_ALLOW_THREADS;
+			while (mysql_fetch_row(self->result));
+			Py_END_ALLOW_THREADS;
+
+			if (mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
+				_mysql_Exception((_mysql_ConnectionObject *)self->conn);
+				return NULL;
+			}
 		}
-		PyTuple_SET_ITEM(r, i, v);
 	}
-	return r;
-  error:
-	Py_XDECREF(r);
-	return NULL;
+	Py_XDECREF(self->fields);
+	self->fields = NULL;
+	Py_XDECREF(self->conn);
+	self->conn = NULL;
+	if (self->result) {
+		mysql_free_result(self->result);
+		self->result = NULL;
+	}
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 static PyObject *
@@ -500,7 +269,7 @@ _mysql_ResultObject_next(
 {
 	PyObject *row;
 	check_result_connection(self);
-	row = _mysql_ResultObject_simple_fetch_row(self, NULL);
+	row = _mysql_ResultObject_fetch_row(self, NULL);
 	if (row == Py_None) {
 		Py_DECREF(row);
 		PyErr_SetString(PyExc_StopIteration, "");
@@ -598,8 +367,8 @@ _mysql_ResultObject_dealloc(
 	_mysql_ResultObject *self)
 {
 	PyObject_GC_UnTrack((PyObject *)self);
+	_mysql_ResultObject_clear(self, NULL);
 	mysql_free_result(self->result);
-	_mysql_ResultObject_clear(self);
 	MyFree(self);
 }
 
@@ -633,6 +402,12 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 		_mysql_ResultObject_row_tell__doc__
 	},
 	{
+		"clear",
+		(PyCFunction)_mysql_ResultObject_clear,
+		METH_NOARGS,
+		_mysql_ResultObject_clear__doc__
+	},
+	{
 		"describe",
 		(PyCFunction)_mysql_ResultObject_describe,
 		METH_NOARGS,
@@ -643,12 +418,6 @@ static PyMethodDef _mysql_ResultObject_methods[] = {
 		(PyCFunction)_mysql_ResultObject_fetch_row,
 		METH_VARARGS | METH_KEYWORDS,
 		_mysql_ResultObject_fetch_row__doc__
-	},
-	{
-		"simple_fetch_row",
-		(PyCFunction)_mysql_ResultObject_simple_fetch_row,
-		METH_VARARGS | METH_KEYWORDS,
-		_mysql_ResultObject_simple_fetch_row__doc__
 	},
 
 	{
@@ -679,13 +448,6 @@ static struct PyMemberDef _mysql_ResultObject_memberlist[] = {
 		offsetof(_mysql_ConnectionObject, connection),
 		RO,
 		"Connection associated with result"
-	},
-	{
-		"decoders",
-		T_OBJECT,
-		offsetof(_mysql_ResultObject, decoders),
-		RO,
-		"Field decoders for result set"
 	},
 	{
 		"fields",

@@ -126,8 +126,7 @@ class Connection(object):
 
         """
         from MySQLdb.constants import CLIENT, FIELD_TYPE
-        from MySQLdb.converters import default_decoders, default_encoders
-        from MySQLdb.converters import simple_type_encoders as conversions
+        from MySQLdb.converters import default_decoders, default_encoders, default_row_formatter
         from MySQLdb.cursors import Cursor
         import _mysql
 
@@ -135,10 +134,10 @@ class Connection(object):
 
         self.cursorclass = Cursor
         charset = kwargs2.pop('charset', '')
-        if 'decoder_stack' not in kwargs2:
-            kwargs2['decoder_stack'] = default_decoders;
+
         self.encoders = kwargs2.pop('encoders', default_encoders)
         self.decoders = kwargs2.pop('decoders', default_decoders)
+        self.row_formatter = kwargs2.pop('row_formatter', default_row_formatter)
         
         client_flag = kwargs.get('client_flag', 0)
         client_version = tuple(
@@ -187,14 +186,14 @@ class Connection(object):
     
     def close(self):
         return self._db.close()
-    
+
     def escape_string(self, s):
         return self._db.escape_string(s)
     
     def string_literal(self, s):
-        return self._db.string_literal(s)
-    
-    def cursor(self, encoders=None, decoders=None):
+        return self._db.string_literal(s)    
+
+    def cursor(self, encoders=None, decoders=None, row_formatter=None):
         """
         Create a cursor on which queries may be performed. The optional
         cursorclass parameter is used to create the Cursor. By default,
@@ -208,8 +207,11 @@ class Connection(object):
         
         if not decoders:
             decoders = self.decoders[:]
+         
+        if not row_formatter:
+            row_formatter = self.row_formatter
             
-        self._active_cursor = self.cursorclass(self, encoders, decoders)
+        self._active_cursor = self.cursorclass(self, encoders, decoders, row_formatter)
         return self._active_cursor
 
     def __enter__(self):
@@ -220,7 +222,7 @@ class Connection(object):
             self.rollback()
         else:
             self.commit()
-            
+
     def literal(self, obj):
         """
         Given an object obj, returns an SQL literal as a string.
@@ -233,17 +235,6 @@ class Connection(object):
                 return f(self, obj)
             
         raise self.NotSupportedError("could not encode as SQL", obj)
-
-    def _warning_count(self):
-        """Return the number of warnings generated from the last query."""
-        if hasattr(self._db, "warning_count"):
-            return self._db.warning_count()
-        else:
-            info = self._db.info()
-            if info:
-                return int(info.split()[-1])
-            else:
-                return 0
 
     def character_set_name(self):
         return self._db.character_set_name()
@@ -263,9 +254,7 @@ class Connection(object):
                 if self._server_version < (4, 1):
                     raise self.NotSupportedError("server is too old to set charset")
                 self._db.query('SET NAMES %s' % charset)
-                self._db.store_result()
-        self.string_decoder.charset = charset
-        self.unicode_literal.charset = charset
+                self._db.get_result()
 
     def set_sql_mode(self, sql_mode):
         """Set the connection sql_mode. See MySQL documentation for legal
@@ -276,8 +265,19 @@ class Connection(object):
         if self._server_version < (4, 1):
             raise self.NotSupportedError("server is too old to set sql_mode")
         self._db.query("SET SESSION sql_mode='%s'" % sql_mode)
-        self._db.store_result()
+        self._db.get_result()
         
+    def _warning_count(self):
+        """Return the number of warnings generated from the last query."""
+        if hasattr(self._db, "warning_count"):
+            return self._db.warning_count()
+        else:
+            info = self._db.info()
+            if info:
+                return int(info.split()[-1])
+            else:
+                return 0
+
     def _show_warnings(self):
         """Return detailed information about warnings as a sequence of tuples
         of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
@@ -287,7 +287,6 @@ class Connection(object):
         so you should not usually call it yourself."""
         if self._server_version < (4, 1): return ()
         self._db.query("SHOW WARNINGS")
-        result = self._db.store_result()
-        warnings = result.fetch_row(0)
-        return warnings
+        return tuple(self._db.get_result())
+
     

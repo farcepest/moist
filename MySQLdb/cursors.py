@@ -13,7 +13,8 @@ __author__ = "$Author$"[9:-2]
 import re
 import sys
 import weakref
-from MySQLdb.converters import get_codec, tuple_row_decoder
+from MySQLdb.converters import get_codec
+from warnings import warn
 
 INSERT_VALUES = re.compile(r"(?P<start>.+values\s*)"
                            r"(?P<values>\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'|[^\(\)]|(?:\([^\)]*\)))+\))"
@@ -40,9 +41,8 @@ class Cursor(object):
     _defer_warnings = False
     _fetch_type = None
 
-    def __init__(self, connection, encoders, decoders):
+    def __init__(self, connection, encoders, decoders, row_formatter):
         self.connection = weakref.proxy(connection)
-        self.description = None
         self.description_flags = None
         self.rowcount = -1
         self.arraysize = 1
@@ -51,6 +51,7 @@ class Cursor(object):
         self.messages = []
         self.errorhandler = connection.errorhandler
         self._result = None
+        self._pending_results = []
         self._warnings = 0
         self._info = None
         self.rownumber = None
@@ -58,29 +59,45 @@ class Cursor(object):
         self.encoders = encoders
         self.decoders = decoders
         self._row_decoders = ()
-        self.row_decoder = tuple_row_decoder
+        self.row_formatter = row_formatter
+        self.use_result = False
 
+    @property
+    def description(self):
+        if self._result:
+            return self._result.description
+        return None
+    
     def _flush(self):
         """_flush() reads to the end of the current result set, buffering what
         it can, and then releases the result set."""
         if self._result:
-            for row in self._result:
-                pass
+            self._result.flush()
             self._result = None
+        db = self._get_db()
+        while db.next_result():
+            result = Result(self)
+            result.flush()
+            self._pending_results.append(result)
     
     def __del__(self):
         self.close()
         self.errorhandler = None
         self._result = None
+        del self._pending_results[:]
 
-    def _reset(self):
-        while True:
-            if self._result:
-                for row in self._result:
-                    pass
-                self._result = None
-            if not self.nextset():
-                break
+    def _clear(self):
+        if self._result:
+            self._result.clear()
+            self._result = None
+        for result in self._pending_results:
+            result.clear()
+        del self._pending_results[:]
+        db = self._get_db()
+        while db.next_result():
+            result = db.get_result(True)
+            if result:
+                result.clear()
         del self.messages[:]
             
     def close(self):
@@ -120,31 +137,19 @@ class Cursor(object):
     def nextset(self):
         """Advance to the next result set.
 
-        Returns None if there are no more result sets.
+        Returns False if there are no more result sets.
         """
-        if self._executed:
-            self.fetchall()
-        del self.messages[:]
-
-        connection = self._get_db()
-        num_rows = connection.next_result()
-        if num_rows == -1:
-            return None
-        result = connection.use_result()
-        self._result = result
-        if result:
-            self.field_flags = result.field_flags()
-            self._row_decoders = [ get_codec(field, self.decoders) for field in result.fields ]
-            self.description = result.describe()
-        else:
-            self._row_decoders = self.field_flags = ()
-            self.description = None
-        self.rowcount = -1 #connection.affected_rows()
-        self.rownumber = 0
-        self.lastrowid = connection.insert_id()
-        self._warnings = connection.warning_count()
-        self._info = connection.info()        
-        return True
+        db = self._get_db()
+        self._result.clear()
+        self._result = None
+        if self._pending_results:
+            self._result = self._pending_results[0]
+            del self._pending_results[0]
+            return True
+        if db.next_result():
+            self._result = Result(self)
+            return True
+        return False
     
     def setinputsizes(self, *args):
         """Does nothing, required by DB API."""
@@ -174,13 +179,13 @@ class Cursor(object):
 
         """
         db = self._get_db()
-        self._reset()
+        self._clear()
         charset = db.character_set_name()
         if isinstance(query, unicode):
             query = query.encode(charset)
         try:
             if args is not None:
-                query = query % tuple(map(self.connection.literal, args))
+                query = query % tuple(( get_codec(a, self.encoders)(db, a) for a in args ))
             self._query(query)
         except TypeError, msg:
             if msg.args[0] in ("not enough arguments for format string",
@@ -220,7 +225,7 @@ class Cursor(object):
 
         """
         db = self._get_db()
-        self._reset()
+        self._clear()
         if not args:
             return
         charset = self.connection.character_set_name()
@@ -228,15 +233,19 @@ class Cursor(object):
             query = query.encode(charset)
         matched = INSERT_VALUES.match(query)
         if not matched:
-            self.rowcount = sum(( self.execute(query, arg) for arg in args ))
-            return self.rowcount
+            rowcount = 0
+            for row in args:
+                self.execute(query, row)
+                rowcount += self.rowcount
+            self.rowcount = rowcount
+            return
         
         start = matched.group('start')
         values = matched.group('values')
         end = matched.group('end')
 
         try:
-            sql_params = ( values % tuple(map(self.connection.literal, row)) for row in args )
+            sql_params = ( values % tuple(( get_codec(a, self.encoders)(db, a) for a in row )) for row in args )
             multirow_query = '\n'.join([start, ',\n'.join(sql_params), end])
             self._query(multirow_query)
 
@@ -317,49 +326,32 @@ class Cursor(object):
         self._flush()
         self._executed = query
         connection.query(query)
-        result = connection.use_result()
-        self._result = result
-        if result:
-            self.field_flags = result.field_flags()
-            self._row_decoders = [ get_codec(field, self.decoders) for field in result.fields ]
-            self.description = result.describe()
-        else:
-            self._row_decoders = self.field_flags = ()
-            self.description = None
-        self.rowcount = -1 #connection.affected_rows()
-        self.rownumber = 0
-        self.lastrowid = connection.insert_id()
-        self._warnings = connection.warning_count()
-        self._info = connection.info()
+        self._result = Result(self)
     
     def fetchone(self):
         """Fetches a single row from the cursor. None indicates that
         no more rows are available."""
         self._check_executed()
-        row = self.row_decoder(self._row_decoders, self._result.simple_fetch_row())
-        return row
+        if not self._result:
+            return None
+        return self._result.fetchone()
 
     def fetchmany(self, size=None):
         """Fetch up to size rows from the cursor. Result set may be smaller
         than size. If size is not defined, cursor.arraysize is used."""
         self._check_executed()
+        if not self._result:
+            return []
         if size is None:
             size = self.arraysize
-        rows = []
-        for i in range(size):
-            row = self.row_decoder(self._row_decoders, self._result.simple_fetch_row())
-            if row is None: break
-            rows.append(row)
-        return rows
+        return self._result.fetchmany(size)
 
     def fetchall(self):
         """Fetches all available rows from the cursor."""
         self._check_executed()
-        if self._result:
-            rows = [ self.row_decoder(self._row_decoders, row) for row in self._result ]
-        else:
-            rows = []
-        return rows
+        if not self._result:
+            return []
+        return self._result.fetchall()
     
     def scroll(self, value, mode='relative'):
         """Scroll the cursor in the result set to a new position according
@@ -380,3 +372,108 @@ class Cursor(object):
             self.errorhandler(self, IndexError, "out of range")
         self.rownumber = row
 
+
+class Result(object):
+    
+    def __init__(self, cursor):
+        self.cursor = cursor
+        db = cursor._get_db()
+        result = db.get_result(cursor.use_result)
+        self.result = result
+        decoders = cursor.decoders
+        self.row_formatter = cursor.row_formatter
+        self.max_buffer = 1000
+        self.rows = []
+        self.row_start = 0
+        self.rows_read = 0
+        self.row_index = 0
+        self.lastrowid = db.insert_id()
+        self.warning_count = db.warning_count()
+        self.info = db.info()
+        self.rowcount = -1
+        self.description = None
+        self.field_flags = ()
+        self.row_decoders = ()
+        
+        if result:
+            self.description = result.describe()
+            self.field_flags = result.field_flags()
+            self.row_decoders = tuple(( get_codec(field, decoders) for field in result.fields ))
+            if not cursor.use_result:
+                self.rowcount = db.affected_rows()
+                self.flush()
+
+    def flush(self):
+        if self.result:
+            self.rows.extend([ self.row_formatter(self.row_decoders, row) for row in self.result ])
+            self.result.clear()
+            self.result = None
+    
+    def clear(self):
+        if self.result:
+            self.result.clear()
+            self.result = None
+               
+    def fetchone(self):
+        if self.result:
+            while self.row_index >= len(self.rows):
+                row = self.result.fetch_row()
+                if row is None:
+                    return row
+                self.rows.append(self.row_formatter(self.row_decoders, row))
+        if self.row_index >= len(self.rows):
+            return None
+        row = self.rows[self.row_index]
+        self.row_index += 1
+        return row
+    
+    def __iter__(self): return self
+    
+    def next(self):
+        row = self.fetchone()
+        if row is None:
+            raise StopIteration
+        return row
+    
+    def fetchmany(self, size):
+        """Fetch up to size rows from the cursor. Result set may be smaller
+        than size. If size is not defined, cursor.arraysize is used."""
+        row_end = self.row_index + size
+        if self.result:
+            while self.row_index >= len(self.rows):
+                row = self.result.fetch_row()
+                if row is None:
+                    break
+                self.rows.append(self.row_formatter(self.row_decoders, row))
+        if self.row_index >= len(self.rows):
+            return []
+        if row_end >= len(self.rows):
+            row_end = len(self.rows)
+        rows = self.rows[self.row_index:row_end]
+        self.row_index = row_end
+        return rows
+    
+    def fetchall(self):
+        if self.result:
+            self.flush()
+        rows = self.rows[self.row_index:]
+        self.row_index = len(self.rows)
+        return rows
+    
+    def warning_check(self):
+        """Check for warnings, and report via the warnings module."""
+        if self.warning_count:
+            cursor = self.cursor
+            warnings = cursor._get_db()._show_warnings()
+            if warnings:
+                # This is done in two loops in case
+                # Warnings are set to raise exceptions.
+                for warning in warnings:
+                    cursor.warnings.append((self.Warning, warning))
+                for warning in warnings:
+                    warn(warning[-1], self.Warning, 3)
+            elif self._info:
+                cursor.messages.append((self.Warning, self._info))
+                warn(self._info, self.Warning, 3)
+
+        

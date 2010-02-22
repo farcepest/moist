@@ -9,7 +9,6 @@ _mysql_ConnectionObject_Initialize(
 	PyObject *kwargs)
 {
 	MYSQL *conn = NULL;
-	PyObject *decoder_stack = NULL;
 	PyObject *ssl = NULL;
 #if HAVE_OPENSSL
 	char *key = NULL, *cert = NULL, *ca = NULL,
@@ -20,7 +19,7 @@ _mysql_ConnectionObject_Initialize(
 	unsigned int port = 0;
 	unsigned int client_flag = 0;
 	static char *kwlist[] = { "host", "user", "passwd", "db", "port",
-				  "unix_socket", "decoder_stack",
+				  "unix_socket", 
 				  "connect_timeout", "compress",
 				  "named_pipe", "init_command",
 				  "read_default_file", "read_default_group",
@@ -33,13 +32,12 @@ _mysql_ConnectionObject_Initialize(
 	     *read_default_file=NULL,
 	     *read_default_group=NULL;
 	
-	self->decoder_stack = NULL;
 	self->open = 0;
 	check_server_init(-1);
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisOiiisssiOi:connect",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssisiiisssiOi:connect",
 					 kwlist,
 					 &host, &user, &passwd, &db,
-					 &port, &unix_socket, &decoder_stack,
+					 &port, &unix_socket,
 					 &connect_timeout,
 					 &compress, &named_pipe,
 					 &init_command, &read_default_file,
@@ -106,12 +104,6 @@ _mysql_ConnectionObject_Initialize(
 		_mysql_Exception(self);
 		return -1;
 	}
-
-	if (!decoder_stack)
-		decoder_stack = PyList_New(0);
-	else
-		Py_INCREF(decoder_stack);
-	self->decoder_stack = decoder_stack;
 
 	/*
 	  PyType_GenericAlloc() automatically sets up GC allocation and
@@ -195,16 +187,12 @@ static int _mysql_ConnectionObject_traverse(
 	visitproc visit,
 	void *arg)
 {
-	if (self->decoder_stack)
-		return visit(self->decoder_stack, arg);
 	return 0;
 }
 
 static int _mysql_ConnectionObject_clear(
 	_mysql_ConnectionObject *self)
 {
-	Py_XDECREF(self->decoder_stack);
-	self->decoder_stack = NULL;
 	return 0;
 }
 
@@ -399,7 +387,7 @@ you had called query() for the next query. This means that you can\n\
 now call store_result(), warning_count(), affected_rows()\n\
 , and so forth. \n\
 \n\
-Returns 0 if there are more results; -1 if there are no more results\n\
+Returns True if there are more results.\n\
 \n\
 Non-standard.\n\
 ";
@@ -418,7 +406,7 @@ _mysql_ConnectionObject_next_result(
 #endif
 	Py_END_ALLOW_THREADS
 	if (err > 0) return _mysql_Exception(self);
-	return PyInt_FromLong(err);
+	return PyInt_FromLong(err == 0);
 }
 
 #if MYSQL_VERSION_ID >= 40100
@@ -917,22 +905,25 @@ _mysql_ConnectionObject_stat(
 	return PyString_FromString(s);
 }
 
-static char _mysql_ConnectionObject_store_result__doc__[] =
-"Returns a result object acquired by mysql_store_result\n\
-(results stored in the client). If no results are available,\n\
-None is returned. Non-standard.\n\
+static char _mysql_ConnectionObject_get_result__doc__[] =
+"Returns a result object. If use is True, mysql_use_result()\n\
+is used; otherwise mysql_store_result() is used (the default).\n\
 ";
 
 static PyObject *
-_mysql_ConnectionObject_store_result(
+_mysql_ConnectionObject_get_result(
 	_mysql_ConnectionObject *self,
-	PyObject *unused)
+	PyObject *args,
+	PyObject *kwargs)
 {
 	PyObject *arglist=NULL, *kwarglist=NULL, *result=NULL;
+	static char *kwlist[] = {"use", NULL};
 	_mysql_ResultObject *r=NULL;
-
+	int use = 0;
+	
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|i:get_result", kwlist, &use)) return NULL;
 	check_connection(self);
-	arglist = Py_BuildValue("(OiO)", self, 0, self->decoder_stack);
+	arglist = Py_BuildValue("(Oi)", self, use);
 	if (!arglist) goto error;
 	kwarglist = PyDict_New();
 	if (!kwarglist) goto error;
@@ -975,41 +966,6 @@ _mysql_ConnectionObject_thread_id(
 	pid = mysql_thread_id(&(self->connection));
 	Py_END_ALLOW_THREADS
 	return PyInt_FromLong((long)pid);
-}
-
-static char _mysql_ConnectionObject_use_result__doc__[] =
-"Returns a result object acquired by mysql_use_result\n\
-(results stored in the server). If no results are available,\n\
-None is returned. Non-standard.\n\
-";
-
-static PyObject *
-_mysql_ConnectionObject_use_result(
-	_mysql_ConnectionObject *self,
-	PyObject *unused)
-{
-	PyObject *arglist=NULL, *kwarglist=NULL, *result=NULL;
-	_mysql_ResultObject *r=NULL;
-
-	check_connection(self);
-	arglist = Py_BuildValue("(OiO)", self, 1, self->decoder_stack);
-	if (!arglist) return NULL;
-	kwarglist = PyDict_New();
-	if (!kwarglist) goto error;
-	r = MyAlloc(_mysql_ResultObject, _mysql_ResultObject_Type);
-	if (!r) goto error;
-	result = (PyObject *) r;
-	if (_mysql_ResultObject_Initialize(r, arglist, kwarglist))
-		goto error;
-	if (!(r->result)) {
-		Py_DECREF(result);
-		Py_INCREF(Py_None);
-		result = Py_None;
-	}
-  error:
-	Py_DECREF(arglist);
-	Py_XDECREF(kwarglist);
-	return result;
 }
 
 static void
@@ -1171,6 +1127,12 @@ static PyMethodDef _mysql_ConnectionObject_methods[] = {
 		_mysql_ConnectionObject_get_proto_info__doc__
 	},
 	{
+		"get_result",
+		(PyCFunction)_mysql_ConnectionObject_get_result,
+		METH_VARARGS | METH_KEYWORDS,
+		_mysql_ConnectionObject_get_result__doc__
+	},
+	{
 		"get_server_info",
 		(PyCFunction)_mysql_ConnectionObject_get_server_info,
 		METH_NOARGS,
@@ -1225,12 +1187,6 @@ static PyMethodDef _mysql_ConnectionObject_methods[] = {
 		_mysql_ConnectionObject_stat__doc__
 	},
 	{
-		"store_result",
-		(PyCFunction)_mysql_ConnectionObject_store_result,
-		METH_NOARGS,
-		_mysql_ConnectionObject_store_result__doc__
-	},
-	{
 		"string_literal",
 		(PyCFunction)_mysql_string_literal,
 		METH_VARARGS,
@@ -1240,12 +1196,6 @@ static PyMethodDef _mysql_ConnectionObject_methods[] = {
 		(PyCFunction)_mysql_ConnectionObject_thread_id,
 		METH_NOARGS,
 		_mysql_ConnectionObject_thread_id__doc__
-	},
-	{
-		"use_result",
-		(PyCFunction)_mysql_ConnectionObject_use_result,
-		METH_NOARGS,
-		_mysql_ConnectionObject_use_result__doc__
 	},
 	{NULL,              NULL} /* sentinel */
 };
@@ -1257,13 +1207,6 @@ static struct PyMemberDef _mysql_ConnectionObject_memberlist[] = {
 		offsetof(_mysql_ConnectionObject, open),
 		RO,
 		"True if connection is open"
-	},
-	{
-		"decoder_stack",
-		T_OBJECT,
-		offsetof(_mysql_ConnectionObject, decoder_stack),
-		0,
-		"Type decoder stack"
 	},
 	{
 		"server_capabilities",

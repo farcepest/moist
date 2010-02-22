@@ -110,7 +110,7 @@ simple_field_decoders = {
     }
 
 # Decoder protocol
-# Each decoder is passed a cursor object and a field object.
+# Each decoder is passed a field object.
 # The decoder returns a single value:
 # * A callable that given an SQL value, returns a Python object.
 # This can be as simple as int or str, etc. If the decoder
@@ -178,8 +178,5 @@ def tuple_row_decoder(decoders, row):
         return None
     return tuple(iter_row_decoder(decoders, row))
 
-
-
-
-
+default_row_formatter = tuple_row_decoder
 
