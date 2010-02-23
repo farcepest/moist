@@ -33,7 +33,7 @@ class Connection(object):
     """MySQL Database Connection Object"""
 
     errorhandler = defaulterrorhandler
-    
+
     from MySQLdb.exceptions import Warning, Error, InterfaceError, DataError, \
          DatabaseError, OperationalError, IntegrityError, InternalError, \
          NotSupportedError, ProgrammingError
@@ -46,7 +46,7 @@ class Connection(object):
 
         host
           string, host to connect
-          
+
         user
           string, user to connect as
 
@@ -64,10 +64,10 @@ class Connection(object):
 
         decoders
           list, SQL decoder stack
-          
+
         encoders
           list, SQL encoder stack
-          
+
         connect_timeout
           number of seconds to wait before the connection attempt
           fails.
@@ -103,7 +103,7 @@ class Connection(object):
           If supplied, the session SQL mode will be changed to this
           setting (MySQL-4.1 and newer). For more details and legal
           values, see the MySQL documentation.
-          
+
         client_flag
           integer, flags to use or 0
           (see MySQL docs or constants/CLIENTS.py)
@@ -116,7 +116,7 @@ class Connection(object):
 
         local_infile
           integer, non-zero enables LOAD LOCAL INFILE; zero disables
-    
+
         There are a number of undocumented, non-standard methods. See the
         documentation for the MySQL C API for some hints on what they do.
 
@@ -134,7 +134,7 @@ class Connection(object):
         self.encoders = kwargs2.pop('encoders', default_encoders)
         self.decoders = kwargs2.pop('decoders', default_decoders)
         self.row_formatter = kwargs2.pop('row_formatter', default_row_formatter)
-        
+
         client_flag = kwargs.get('client_flag', 0)
         client_version = tuple(
             [ int(n) for n in _mysql.get_client_info().split('.')[:2] ])
@@ -142,11 +142,11 @@ class Connection(object):
             client_flag |= CLIENT.MULTI_STATEMENTS
         if client_version >= (5, 0):
             client_flag |= CLIENT.MULTI_RESULTS
-        
+
         kwargs2['client_flag'] = client_flag
-        
+
         sql_mode = kwargs2.pop('sql_mode', None)
-        
+
         self._db = _mysql.connection(*args, **kwargs2)
 
         self._server_version = tuple(
@@ -164,7 +164,7 @@ class Connection(object):
             self.autocommit(False)
         self.messages = []
         self._active_cursor = None
-    
+
     def autocommit(self, do_autocommit):
         self._autocommit = do_autocommit
         return self._db.autocommit(do_autocommit)
@@ -173,19 +173,19 @@ class Connection(object):
         if reconnect and not self._autocommit:
             raise ProgrammingError("autocommit must be enabled before enabling auto-reconnect; consider the consequences")
         return self._db.ping(reconnect)
-    
+
     def commit(self):
         return self._db.commit()
-    
+
     def rollback(self):
         return self._db.rollback()
-    
+
     def close(self):
         return self._db.close()
 
     def escape_string(self, s):
         return self._db.escape_string(s)
-    
+
     def string_literal(self, s):
         return self._db.string_literal(s)    
 
@@ -197,22 +197,22 @@ class Connection(object):
         """
         if self._active_cursor:
             self._active_cursor._flush()
-            
+
         if not encoders:
             encoders = self.encoders[:]
-        
+
         if not decoders:
             decoders = self.decoders[:]
-         
+
         if not row_formatter:
             row_formatter = self.row_formatter
-            
+
         self._active_cursor = self.cursorclass(self, encoders, decoders, row_formatter)
         return self._active_cursor
 
     def __enter__(self):
         return self.cursor()
-    
+
     def __exit__(self, exc, value, traceback):
         if exc:
             self.rollback()
@@ -229,18 +229,18 @@ class Connection(object):
             f = encoder(obj)
             if f:
                 return f(self, obj)
-            
+
         raise self.NotSupportedError("could not encode as SQL", obj)
 
     def character_set_name(self):
         return self._db.character_set_name()
-    
+
     def set_character_set(self, charset):
         """Set the connection character set to charset. The character set can
         only be changed in MySQL-4.1 and newer. If you try to change the
         character set from the current value in an older version,
         NotSupportedError will be raised.
-        
+
         Non-standard. It is better to set the character set when creating the
         connection using the charset parameter."""
         if self.character_set_name() != charset:
@@ -255,14 +255,14 @@ class Connection(object):
     def set_sql_mode(self, sql_mode):
         """Set the connection sql_mode. See MySQL documentation for legal
         values.
-        
+
         Non-standard. It is better to set this when creating the connection
         using the sql_mode parameter."""
         if self._server_version < (4, 1):
             raise self.NotSupportedError("server is too old to set sql_mode")
         self._db.query("SET SESSION sql_mode='%s'" % sql_mode)
         self._db.get_result()
-        
+
     def _warning_count(self):
         """Return the number of warnings generated from the last query."""
         if hasattr(self._db, "warning_count"):
@@ -278,11 +278,11 @@ class Connection(object):
         """Return detailed information about warnings as a sequence of tuples
         of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
         If your server is an earlier version, an empty sequence is returned.
-        
+
         Non-standard. This is invoked automatically after executing a query,
         so you should not usually call it yourself."""
         if self._server_version < (4, 1): return ()
         self._db.query("SHOW WARNINGS")
         return tuple(self._db.get_result())
 
-    
+

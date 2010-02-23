@@ -82,7 +82,7 @@ simple_type_encoders = {
     datetime.timedelta: timedelta_to_sql,
     set: Set_to_sql,
     str: object_to_quoted_sql, # default
-    }
+}
 
 # This is for MySQL column types that can be converted directly
 # into Python types without having to look at metadata (flags,
@@ -104,7 +104,7 @@ simple_field_decoders = {
     FIELD_TYPE.DATETIME: datetime_or_None,
     FIELD_TYPE.TIME: timedelta_or_None,
     FIELD_TYPE.DATE: date_or_None,   
-    }
+}
 
 # Decoder protocol
 # Each decoder is passed a field object.
@@ -119,7 +119,7 @@ def default_decoder(field):
 
 def default_encoder(value):
     return object_to_quoted_sql
-    
+
 def simple_decoder(field):
     return simple_field_decoders.get(field.type, None)
 
@@ -131,32 +131,32 @@ character_types = [
     FIELD_TYPE.STRING,
     FIELD_TYPE.VAR_STRING,
     FIELD_TYPE.VARCHAR,
-    ]
+]
 
 def character_decoder(field):
     if field.type not in character_types:
         return None
     if field.charsetnr == 63: # BINARY
         return str
-    
+
     charset = field.result.connection.character_set_name()
     def char_to_unicode(s):
         if s is None:
             return s
         return s.decode(charset)
-    
+
     return char_to_unicode
 
 default_decoders = [
     character_decoder,
     simple_decoder,
     default_decoder,
-    ]
+]
 
 default_encoders = [
     simple_encoder,
     default_encoder,
-    ]
+]
 
 def get_codec(field, codecs):
     for c in codecs:

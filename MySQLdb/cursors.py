@@ -19,9 +19,9 @@ INSERT_VALUES = re.compile(r"(?P<start>.+values\s*)"
 
 
 class Cursor(object):
-    
+
     """A base for Cursor classes. Useful attributes:
-    
+
     description
         A tuple of DB API 7-tuples describing the columns in
         the last executed query; see PEP-249 for details.
@@ -64,7 +64,7 @@ class Cursor(object):
         if self._result:
             return self._result.description
         return None
-    
+
     def _flush(self):
         """_flush() reads to the end of the current result set, buffering what
         it can, and then releases the result set."""
@@ -76,7 +76,7 @@ class Cursor(object):
             result = Result(self)
             result.flush()
             self._pending_results.append(result)
-    
+
     def __del__(self):
         self.close()
         self.errorhandler = None
@@ -96,12 +96,12 @@ class Cursor(object):
             if result:
                 result.clear()
         del self.messages[:]
-            
+
     def close(self):
         """Close the cursor. No further queries will be possible."""
         if not self.connection:
             return
-        
+
         self._flush()
         try:
             while self.nextset():
@@ -147,24 +147,24 @@ class Cursor(object):
             self._result = Result(self)
             return True
         return False
-    
+
     def setinputsizes(self, *args):
         """Does nothing, required by DB API."""
-      
+
     def setoutputsizes(self, *args):
         """Does nothing, required by DB API."""
 
     def _get_db(self):
         """Get the database connection.
-        
+
         Raises ProgrammingError if the connection has been closed."""
         if not self.connection:
             self.errorhandler(self, self.ProgrammingError, "cursor closed")
         return self.connection._db
-    
+
     def execute(self, query, args=None):
         """Execute a query.
-        
+
         query -- string, query to execute on server
         args -- optional sequence or mapping, parameters to use with query.
 
@@ -197,25 +197,25 @@ class Cursor(object):
             del traceback
             self.messages.append((exc, value))
             self.errorhandler(self, exc, value)
-            
+
         if not self._defer_warnings:
             self._warning_check()
         return None
 
     def executemany(self, query, args):
         """Execute a multi-row query.
-        
+
         query
-        
+
             string, query to execute on server
 
         args
 
             Sequence of sequences or mappings, parameters to use with
             query.
-            
+
         Returns long integer rows affected, if any.
-        
+
         This method improves performance on multiple-row INSERT and
         REPLACE. Otherwise it is equivalent to looping over args with
         execute().
@@ -236,7 +236,7 @@ class Cursor(object):
                 rowcount += self.rowcount
             self.rowcount = rowcount
             return
-        
+
         start = matched.group('start')
         values = matched.group('values')
         end = matched.group('end')
@@ -258,14 +258,14 @@ class Cursor(object):
             exc, value, traceback = sys.exc_info()
             del traceback
             self.errorhandler(self, exc, value)
-        
+
         if not self._defer_warnings:
             self._warning_check()
         return None
-    
+
     def callproc(self, procname, args=()):
         """Execute stored procedure procname with args
-        
+
         procname
             string, name of procedure to execute on server
 
@@ -303,7 +303,7 @@ class Cursor(object):
                 query = query.encode(charset)
             self._query(query)
             self.nextset()
-            
+
         query = "CALL %s(%s)" % (procname,
                                  ','.join(['@_%s_%d' % (procname, i)
                                            for i in range(len(args))]))
@@ -324,7 +324,7 @@ class Cursor(object):
         self._executed = query
         connection.query(query)
         self._result = Result(self)
-    
+
     def fetchone(self):
         """Fetches a single row from the cursor. None indicates that
         no more rows are available."""
@@ -349,11 +349,11 @@ class Cursor(object):
         if not self._result:
             return []
         return self._result.fetchall()
-    
+
     def scroll(self, value, mode='relative'):
         """Scroll the cursor in the result set to a new position according
         to mode.
-        
+
         If mode is 'relative' (default), value is taken as offset to
         the current position in the result set, if set to 'absolute',
         value states an absolute target position."""
@@ -371,7 +371,7 @@ class Cursor(object):
 
 
 class Result(object):
-    
+
     def __init__(self, cursor):
         self.cursor = cursor
         db = cursor._get_db()
@@ -391,7 +391,7 @@ class Result(object):
         self.description = None
         self.field_flags = ()
         self.row_decoders = ()
-        
+
         if result:
             self.description = result.describe()
             self.field_flags = result.field_flags()
@@ -405,12 +405,12 @@ class Result(object):
             self.rows.extend([ self.row_formatter(self.row_decoders, row) for row in self.result ])
             self.result.clear()
             self.result = None
-    
+
     def clear(self):
         if self.result:
             self.result.clear()
             self.result = None
-               
+
     def fetchone(self):
         if self.result:
             while self.row_index >= len(self.rows):
@@ -423,15 +423,15 @@ class Result(object):
         row = self.rows[self.row_index]
         self.row_index += 1
         return row
-    
+
     def __iter__(self): return self
-    
+
     def next(self):
         row = self.fetchone()
         if row is None:
             raise StopIteration
         return row
-    
+
     def fetchmany(self, size):
         """Fetch up to size rows from the cursor. Result set may be smaller
         than size. If size is not defined, cursor.arraysize is used."""
@@ -449,14 +449,14 @@ class Result(object):
         rows = self.rows[self.row_index:row_end]
         self.row_index = row_end
         return rows
-    
+
     def fetchall(self):
         if self.result:
             self.flush()
         rows = self.rows[self.row_index:]
         self.row_index = len(self.rows)
         return rows
-    
+
     def warning_check(self):
         """Check for warnings, and report via the warnings module."""
         if self.warning_count:
@@ -473,4 +473,4 @@ class Result(object):
                 cursor.messages.append((self.Warning, self._info))
                 warn(self._info, self.Warning, 3)
 
-        
+
