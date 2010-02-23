@@ -7,9 +7,6 @@ Most of these you will not have to use directly.
 
 Uses Python datetime module to handle time-releated columns."""
 
-__revision__ = "$Revision$"[11:-2]
-__author__ = "$Author$"[9:-2]
-
 from time import localtime
 from datetime import date, datetime, time, timedelta
 

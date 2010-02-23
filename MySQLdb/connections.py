@@ -9,10 +9,6 @@ override Connection.default_cursor with a non-standard Cursor class.
 
 """
 
-__revision__ = "$Revision$"[11:-2]
-__author__ = "$Author$"[9:-2]
-
-
 def defaulterrorhandler(connection, cursor, errorclass, errorvalue):
     """
     If cursor is not None, (errorclass, errorvalue) is appended to

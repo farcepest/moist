@@ -17,9 +17,6 @@ import datetime
 from decimal import Decimal
 from itertools import izip
 
-__revision__ = "$Revision$"[11:-2]
-__author__ = "$Author$"[9:-2]
-
 def bool_to_sql(connection, boolean):
     """Convert a Python bool to an SQL literal."""
     return str(int(boolean))

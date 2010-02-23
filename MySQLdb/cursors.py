@@ -7,9 +7,6 @@ create Cursors direction; use connection.cursor() instead.
 
 """
 
-__revision__ = "$Revision$"[11:-2]
-__author__ = "$Author$"[9:-2]
-
 import re
 import sys
 import weakref

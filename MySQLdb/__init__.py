@@ -16,7 +16,6 @@ For information on how MySQLdb handles type conversion, see the
 MySQLdb.converters module.
 """
 
-__revision__ = """$Revision$"""[11:-2]
 from MySQLdb.release import __version__, version_info, __author__
 from MySQLdb.exceptions import Warning, Error, InterfaceError, DataError, \
      DatabaseError, OperationalError, IntegrityError, InternalError, \
