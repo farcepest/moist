@@ -194,9 +194,9 @@ class Cursor(object):
                 self.errorhandler(self, TypeError, msg)
         except:
             exc, value, traceback = sys.exc_info()
-            del traceback
             self.messages.append((exc, value))
             self.errorhandler(self, exc, value)
+            del traceback
 
         if not self._defer_warnings:
             self._warning_check()

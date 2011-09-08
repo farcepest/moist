@@ -9,8 +9,8 @@ MySQLdb type conversion module
 from _mysql import NULL
 from MySQLdb.constants import FIELD_TYPE, FLAG
 from MySQLdb.times import datetime_to_sql, timedelta_to_sql, \
-     timedelta_or_None, datetime_or_None, date_or_None, \
-     mysql_timestamp_converter
+     timedelta_or_orig, datetime_or_orig, date_or_orig, \
+     timestamp_or_orig
 from types import InstanceType
 import array
 import datetime
@@ -44,6 +44,24 @@ def float_to_sql(connection, value):
 def None_to_sql(connection, value):
     """Convert None to NULL."""
     return NULL # duh
+
+def None_if_NULL(func):
+    if func is None: return func
+    def _None_if_NULL(value):
+        if value is None: return value
+        return func(value)
+    _None_if_NULL.__name__ = func.__name__+"_or_None_if_NULL"
+    return _None_if_NULL
+
+
+int_or_None_if_NULL = None_if_NULL(int)
+float_or_None_if_NULL = None_if_NULL(float)
+Decimal_or_None_if_NULL = None_if_NULL(Decimal)
+SET_to_Set_or_None_if_NULL = None_if_NULL(SET_to_Set)
+timestamp_or_None_if_NULL = None_if_NULL(timestamp_or_orig)
+datetime_or_None_if_NULL = None_if_NULL(datetime_or_orig)
+date_or_None_if_NULL = None_if_NULL(date_or_orig)
+timedelta_or_None_if_NULL = None_if_NULL(timedelta_or_orig)
 
 def object_to_quoted_sql(connection, obj):
     """Convert something into a SQL string literal."""
@@ -89,21 +107,21 @@ simple_type_encoders = {
 # character sets, etc.). This should always be used as the last
 # resort.
 simple_field_decoders = {
-    FIELD_TYPE.TINY: int,
-    FIELD_TYPE.SHORT: int,
-    FIELD_TYPE.LONG: int,
-    FIELD_TYPE.FLOAT: float,
-    FIELD_TYPE.DOUBLE: float,
-    FIELD_TYPE.DECIMAL: Decimal,
-    FIELD_TYPE.NEWDECIMAL: Decimal,
-    FIELD_TYPE.LONGLONG: int,
-    FIELD_TYPE.INT24: int,
-    FIELD_TYPE.YEAR: int,
-    FIELD_TYPE.SET: SET_to_Set,
-    FIELD_TYPE.TIMESTAMP: mysql_timestamp_converter,
-    FIELD_TYPE.DATETIME: datetime_or_None,
-    FIELD_TYPE.TIME: timedelta_or_None,
-    FIELD_TYPE.DATE: date_or_None,   
+    FIELD_TYPE.TINY: int_or_None_if_NULL,
+    FIELD_TYPE.SHORT: int_or_None_if_NULL,
+    FIELD_TYPE.LONG: int_or_None_if_NULL,
+    FIELD_TYPE.FLOAT: float_or_None_if_NULL,
+    FIELD_TYPE.DOUBLE: float_or_None_if_NULL,
+    FIELD_TYPE.DECIMAL: Decimal_or_None_if_NULL,
+    FIELD_TYPE.NEWDECIMAL: Decimal_or_None_if_NULL,
+    FIELD_TYPE.LONGLONG: int_or_None_if_NULL,
+    FIELD_TYPE.INT24: int_or_None_if_NULL,
+    FIELD_TYPE.YEAR: int_or_None_if_NULL,
+    FIELD_TYPE.SET: SET_to_Set_or_None_if_NULL,
+    FIELD_TYPE.TIMESTAMP: timestamp_or_None_if_NULL,
+    FIELD_TYPE.DATETIME: datetime_or_None_if_NULL,
+    FIELD_TYPE.TIME: timedelta_or_None_if_NULL,
+    FIELD_TYPE.DATE: date_or_None_if_NULL,
 }
 
 # Decoder protocol
